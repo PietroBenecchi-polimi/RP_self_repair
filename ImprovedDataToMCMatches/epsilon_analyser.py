@@ -22,7 +22,9 @@ results = []
 for i, result in enumerate(matches):
     results.append({
         "Configuration_ID": i,  # Configuration ID (index from query dataset)
-        "Has_Match": result.match  # Boolean indicating whether a match was found
+        "Has_Match": result["has_match"],  # Boolean indicating whether a match was found
+        "mc_config": result["mc_config"],
+        "opt_config": result["opt_config"]
     })
 
 # Convert results to a DataFrame
@@ -30,7 +32,7 @@ results_df = pd.DataFrame(results)
 
 # Save results to a CSV file
 file_name = f"match_results_{epsilon_percentage}.csv"
-results_df.to_csv("./match_results/" + file_name, index=False)
+results_df.to_csv("./ImprovedDataToMCMatches/match_results/" + file_name, index=False)
 
 # Calculate statistics
 total_data = len(results)

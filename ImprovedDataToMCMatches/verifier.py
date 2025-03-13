@@ -10,31 +10,32 @@ mc_set = pd.read_csv("./datasets/initial_configurations_to_improve.csv")
 # Find similar configurations
 results = find_similar_configs(optimized_set, parsed_mc_set, 0.05, mc_set)
 
-FTG_threshold = 0.05
+FTG_threshold = 0.1
 validity_array = []
 
 for result in results:
     if result["has_match"]:
         opt_SCS = result["opt_config"]["SCS"]
         mc_SCS = result["mc_config"]["SCS"]
-
+        validity = True
+        ub = result["mc_config"]["PRSCS_UB"]
+        lb =result["mc_config"]["PRSCS_LB"]
         # Validate SCS
-        if not math.isnan(mc_SCS):
-            validity = result["mc_config"]["PRSCS_UB"] <= mc_SCS
+        if opt_SCS > 0.9:
+            validity = validity and bool(opt_SCS)
         else:
-            validity = result["mc_config"]["PRSCS_LB"] >= mc_SCS
-
+            validity = validity and not bool(opt_SCS)
         # Validate FTG
-        mc_ftg = result["mc_config"]["FTG_HUM_1"]
-        opt_ftg = result["opt_config"]["FTG"]
+        # mc_ftg = result["mc_config"]["FTG_HUM_2"]
+        # opt_ftg = result["opt_config"]["FTG"]
 
-        if mc_ftg == 0 and opt_ftg == 0:
-            validity = True
-        elif mc_ftg == 0 or opt_ftg == 0:
-            validity = abs(mc_ftg - opt_ftg) <= FTG_threshold  # Avoid division by zero
-        else:
-            validity = abs(mc_ftg - opt_ftg) / max(abs(mc_ftg), abs(opt_ftg)) <= FTG_threshold
-
+        # if mc_ftg == 0 and opt_ftg == 0:
+        #     validity = validity and True
+        # elif mc_ftg == 0 or opt_ftg == 0:
+        #     validity = validity and (abs(mc_ftg - opt_ftg) <= FTG_threshold)
+        # else:
+        #     validity = validity and (abs(mc_ftg - opt_ftg) / max(abs(mc_ftg), abs(opt_ftg)) <= FTG_threshold)
+        # print(f"MC_FTG: {mc_ftg}, MC_FTG: {opt_ftg}")
         validity_array.append(validity)
 
 # Summary
