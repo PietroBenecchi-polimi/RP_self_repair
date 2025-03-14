@@ -8,9 +8,10 @@ parsed_mc_set = pd.read_csv("./ImprovedDataToMCMatches/refinedData/transformed_d
 mc_set = pd.read_csv("./datasets/initial_configurations_to_improve.csv")
 
 # Find similar configurations
-results = find_similar_configs(optimized_set, parsed_mc_set, 0.05, mc_set)
+results = find_similar_configs(optimized_set, parsed_mc_set, 0.5, mc_set)
 
 validity_array = []
+FTG_threshold = 0.01
 def validate_scs(opt_SCS, mc_SCS):
     """Validate the SCS parameter."""
     if opt_SCS > 0.9:
@@ -34,11 +35,10 @@ for result in results:
         validity = validate_scs(opt_SCS, mc_SCS)
 
         # Uncomment to include FTG validation
-        # mc_ftg = result["mc_config"]["FTG_HUM_1"]
-        # opt_ftg = result["opt_config"]["FTG"]
-        # validity = validity and validate_ftg(mc_ftg, opt_ftg, FTG_threshold)
-
+        mc_ftg = result["mc_config"]["FTG_HUM_1"]
+        opt_ftg = result["opt_config"]["FTG"]
+        validity = validity and validate_ftg(mc_ftg, opt_ftg, FTG_threshold)
         validity_array.append(validity)
 
 invalid_count = sum(not v for v in validity_array)
-print(f"Over {len(validity_array)} comparisons, {invalid_count} were invalid")
+print(f"Over {len(validity_array)} comparisons, {invalid_count} were invalid, total success percentage: {round(1 - (invalid_count / len(validity_array)), 2)}%")

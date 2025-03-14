@@ -9,19 +9,65 @@ import pandas as pd
 import ast
 import math
 import json
-def find_similar_configs(df_B, df_A, epsilon_percentage, original_df=None):
-    """
-    Find similar configurations between two datasets within a proportional epsilon range.
+import numpy as np
+from scipy.spatial import KDTree
 
-    Args:
-        df_B (pd.DataFrame): DataFrame of the query dataset (to retain column names).
-        df_A (pd.DataFrame): DataFrame of the reference dataset (to retain column names).
-        epsilon_percentage (float): Proportional epsilon (e.g., 0.1 for 10%).
-        original_df (pd.DataFrame, optional): Original reference DataFrame if different from df_A. Defaults to None.
+import json
 
-    Returns:
-        list: A list of dictionaries containing the query configuration, matched configuration (with column names), and match status.
-    """
+def find_similar_configs(df_A, df_B, epsilon_percentage, original_df=None):
+    # Load factors from JSON file
+    with open("./datasets/hmtfactor_config.json", "r") as file:
+        factors = json.load(file)
+    
+    # Convert dataframes to dictionaries
+    dataset_A = df_A.to_dict(orient="records")
+    dataset_B = df_B.to_dict(orient="records")
+    results = []
+    
+    for opt_idx, opt_config in enumerate(dataset_B):
+        for mc_idx, mc_config in enumerate(dataset_A):
+            valid = True
+            for factor_key in opt_config.keys():
+                if factor_key not in mc_config:
+                    valid = False
+                    break
+                
+                difference = abs(opt_config[factor_key] - mc_config[factor_key])
+                
+                if factor_key in factors:
+                    if "max" in factors[factor_key]:
+                        range_val = factors[factor_key]["max"] - factors[factor_key]["min"]
+                        valid = valid and (difference / range_val < epsilon_percentage)
+                    else:
+                        valid = valid and (difference < epsilon_percentage)
+                elif factor_key in ["HUM_1_POS_X", "HUM_2_POS_X"]:
+                    range_val = factors["HUM_1_POS"]["max_x"] - factors["HUM_1_POS"]["min_x"]
+                    valid = valid and (difference / range_val < epsilon_percentage)
+                elif factor_key in ["HUM_1_POS_Y", "HUM_2_POS_Y"]:
+                    range_val = factors["HUM_1_POS"]["max_y"] - factors["HUM_1_POS"]["min_y"]
+                    valid = valid and (difference / range_val < epsilon_percentage)
+                else:
+                    valid = valid and (difference < epsilon_percentage)
+                
+                if not valid:
+                    break
+            if valid:
+                results.append({
+                    "opt_config": opt_config,
+                    "mc_config": (dataset_A[mc_idx] if original_df is None else original_df.iloc[mc_idx].to_dict()),
+                    "has_match": True
+                })
+                break
+        if(not valid):
+            results.append({
+                    "opt_config": opt_config,
+                    "mc_config": None,
+                    "has_match": False
+                })
+    
+    return results
+
+def find_similar_configs_old(df_B, df_A, epsilon_percentage, original_df=None):
     dataset_A = df_A.to_numpy()
     dataset_B = df_B.to_numpy()
     tree = KDTree(dataset_A)
@@ -49,7 +95,7 @@ def find_similar_configs(df_B, df_A, epsilon_percentage, original_df=None):
             })
     return results
 
-def match_results_analyer(match_results, num_rows=10): 
+def match_results_analyer(match_results): 
     with open("./datasets/hmtfactor_config.json", "r") as file:
         factors = json.load(file)
     with open("./datasets/metrics.json", "r") as file:
@@ -57,9 +103,11 @@ def match_results_analyer(match_results, num_rows=10):
     output_csv_path = "./ImprovedDataToMCMatches/match_results/opt_mc_difference.csv"
     # Convert DataFrame to a list of dictionaries
     match_results = match_results.to_dict(orient='records')
+    match_results = [match for match in match_results if match["Has_Match"] == True]
+    print(f"Total matches {len(match_results)}")
     results = []
 
-    for row in match_results[:num_rows]:
+    for row in match_results:
         try:
             opt_conf = ast.literal_eval(row.get("opt_config", "{}"))
             mc_conf = ast.literal_eval(row.get("mc_config", "{}"))
@@ -81,8 +129,6 @@ def match_results_analyer(match_results, num_rows=10):
                 if("max" in factors[factor_key].keys()):
                     range = factors[factor_key]["max"] - factors[factor_key]["min"]
                     row_result[f"{factor_key}(%)"] = difference / range
-                elif factors[factor_key]["type"] == "FatigueProfile" and factors[factor_key]["type"] == "FreeWillProfile":
-                    row_result[f"{factor_key}"] = difference
                 else:
                     row_result[f"{factor_key}"] = difference
             elif factor_key == "HUM_1_POS_X" or factor_key == "HUM_2_POS_X":
@@ -106,5 +152,5 @@ def match_results_analyer(match_results, num_rows=10):
 
 
 
-match_results = pd.read_csv("./ImprovedDataToMCMatches/match_results/match_results_0.05.csv")
-match_results_analyer(match_results, 1000)
+# match_results = pd.read_csv("./ImprovedDataToMCMatches/match_results/match_results_0.5.csv")
+# match_results_analyer(match_results)
