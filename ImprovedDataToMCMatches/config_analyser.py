@@ -8,6 +8,7 @@ from scipy.spatial import KDTree
 import pandas as pd
 import ast
 import math
+import json
 def find_similar_configs(df_B, df_A, epsilon_percentage, original_df=None):
     """
     Find similar configurations between two datasets within a proportional epsilon range.
@@ -48,7 +49,11 @@ def find_similar_configs(df_B, df_A, epsilon_percentage, original_df=None):
             })
     return results
 
-def match_results_analyer(match_results, num_rows=10):
+def match_results_analyer(match_results, num_rows=10): 
+    with open("./datasets/hmtfactor_config.json", "r") as file:
+        factors = json.load(file)
+    with open("./datasets/metrics.json", "r") as file:
+        metrics = json.load(file)
     output_csv_path = "./ImprovedDataToMCMatches/match_results/opt_mc_difference.csv"
     # Convert DataFrame to a list of dictionaries
     match_results = match_results.to_dict(orient='records')
@@ -56,7 +61,6 @@ def match_results_analyer(match_results, num_rows=10):
 
     for row in match_results[:num_rows]:
         try:
-            # Parse configurations
             opt_conf = ast.literal_eval(row.get("opt_config", "{}"))
             mc_conf = ast.literal_eval(row.get("mc_config", "{}"))
             match_id = row.get("Configuration_ID")
@@ -66,16 +70,29 @@ def match_results_analyer(match_results, num_rows=10):
         if not mc_conf:
             continue
 
-        # Initialize a dictionary for the current row's results
         row_result = {"id": match_id}
 
         # Calculate differences for each factor key
         for factor_key in mc_conf.keys():
-            if factor_key in opt_conf:
-                difference = abs(mc_conf[factor_key] - opt_conf[factor_key])
-                row_result[f"diff_{factor_key}"] = difference
+            if(factor_key in metrics.keys()):
+                continue
+            difference = abs(mc_conf[factor_key] - opt_conf[factor_key])
+            if factor_key in factors.keys():
+                if("max" in factors[factor_key].keys()):
+                    range = factors[factor_key]["max"] - factors[factor_key]["min"]
+                    row_result[f"{factor_key}(%)"] = difference / range
+                elif factors[factor_key]["type"] == "FatigueProfile" and factors[factor_key]["type"] == "FreeWillProfile":
+                    row_result[f"{factor_key}"] = difference
+                else:
+                    row_result[f"{factor_key}"] = difference
+            elif factor_key == "HUM_1_POS_X" or factor_key == "HUM_2_POS_X":
+                range = factors["HUM_1_POS"]["max_x"] - factors["HUM_1_POS"]["min_x"]
+                row_result[f"{factor_key}(%)"] = difference / range
+            elif factor_key == "HUM_1_POS_Y" or factor_key == "HUM_2_POS_Y":
+                range = factors["HUM_1_POS"]["max_y"] - factors["HUM_1_POS"]["min_y"]
+                row_result[f"{factor_key}(%)"] = difference / range
             else:
-                row_result[f"diff_{factor_key}"] = None  # Handle missing keys
+                row_result[f"{factor_key}"] = difference
 
         # Add the row result to the results list
         results.append(row_result)
@@ -86,5 +103,8 @@ def match_results_analyer(match_results, num_rows=10):
     # Save the DataFrame to a CSV file
     results_df.to_csv(output_csv_path, index=False)
     print(f"Results saved to {output_csv_path}")
+
+
+
 match_results = pd.read_csv("./ImprovedDataToMCMatches/match_results/match_results_0.05.csv")
-match_results_analyer(match_results)
+match_results_analyer(match_results, 1000)
