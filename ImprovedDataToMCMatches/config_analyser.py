@@ -6,7 +6,8 @@ Usage: Input the two datasets and a given epsilon (between 0 and 1), and the fun
 import numpy as np
 from scipy.spatial import KDTree
 import pandas as pd
-
+import ast
+import math
 def find_similar_configs(df_B, df_A, epsilon_percentage, original_df=None):
     """
     Find similar configurations between two datasets within a proportional epsilon range.
@@ -46,3 +47,44 @@ def find_similar_configs(df_B, df_A, epsilon_percentage, original_df=None):
                 "has_match": False                   # Match status
             })
     return results
+
+def match_results_analyer(match_results, num_rows=10):
+    output_csv_path = "./ImprovedDataToMCMatches/match_results/opt_mc_difference.csv"
+    # Convert DataFrame to a list of dictionaries
+    match_results = match_results.to_dict(orient='records')
+    results = []
+
+    for row in match_results[:num_rows]:
+        try:
+            # Parse configurations
+            opt_conf = ast.literal_eval(row.get("opt_config", "{}"))
+            mc_conf = ast.literal_eval(row.get("mc_config", "{}"))
+            match_id = row.get("Configuration_ID")
+        except (ValueError, SyntaxError) as e:
+            continue
+
+        if not mc_conf:
+            continue
+
+        # Initialize a dictionary for the current row's results
+        row_result = {"id": match_id}
+
+        # Calculate differences for each factor key
+        for factor_key in mc_conf.keys():
+            if factor_key in opt_conf:
+                difference = abs(mc_conf[factor_key] - opt_conf[factor_key])
+                row_result[f"diff_{factor_key}"] = difference
+            else:
+                row_result[f"diff_{factor_key}"] = None  # Handle missing keys
+
+        # Add the row result to the results list
+        results.append(row_result)
+
+    # Convert results to a DataFrame
+    results_df = pd.DataFrame(results)
+
+    # Save the DataFrame to a CSV file
+    results_df.to_csv(output_csv_path, index=False)
+    print(f"Results saved to {output_csv_path}")
+match_results = pd.read_csv("./ImprovedDataToMCMatches/match_results/match_results_0.05.csv")
+match_results_analyer(match_results)
