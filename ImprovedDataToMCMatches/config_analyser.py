@@ -1,8 +1,3 @@
-"""
-This script compares two datasets (optimized_set and dataset_A) to find similar configurations within a user-defined proportional epsilon range.
-
-Usage: Input the two datasets and a given epsilon (between 0 and 1), and the function will provide an array of both optimized configuration and MC configuration, along with whether they match or not.
-"""
 import numpy as np
 from scipy.spatial import KDTree
 import pandas as pd
@@ -15,15 +10,31 @@ from scipy.spatial import KDTree
 import json
 
 def find_similar_configs(df_A, df_B, epsilon_percentage, original_df=None):
-    # Load factors from JSON file
+    """
+    Finds similar configurations between two datasets (df_A and df_B) based on a given epsilon percentage.
+
+    This function compares configurations in df_B with those in df_A. A configuration in df_B is considered
+    similar to a configuration in df_A if the difference between their factor values is within the specified
+    epsilon percentage of the range of the factor.
+
+    Args:
+        df_A (pd.DataFrame): The reference dataset containing configurations to compare against.
+        df_B (pd.DataFrame): The target dataset containing configurations to find matches for.
+        epsilon_percentage (float): The percentage of the factor range used to determine similarity.
+        original_df (pd.DataFrame, optional): The original dataset to use for mc_config if provided. Defaults to None.
+
+    Returns:
+        dict: A dictionary containing the results of the matching process, including:
+            - data: A list of dictionaries with matched configurations and their details.
+            - epsilon: The epsilon percentage used for matching.
+            - method: The method used for matching ("factor_difference").
+    """
     with open("./datasets/hmtfactor_config.json", "r") as file:
         factors = json.load(file)
     
-    # Convert dataframes to dictionaries
     dataset_A = df_A.to_dict(orient="records")
     dataset_B = df_B.to_dict(orient="records")
     results = []
-    
     for opt_idx, opt_config in enumerate(dataset_B):
         for mc_idx, mc_config in enumerate(dataset_A):
             valid = True
@@ -65,9 +76,28 @@ def find_similar_configs(df_A, df_B, epsilon_percentage, original_df=None):
                     "has_match": False
                 })
     
-    return results
+    return {"data": results, "epsilon": epsilon_percentage, "method": "factor_difference"}
+
 
 def find_similar_configs_old(df_B, df_A, epsilon_percentage, original_df=None):
+    """
+    Finds similar configurations between two datasets (df_B and df_A) using a KDTree-based approach.
+
+    This function uses a KDTree to find configurations in df_A that are within a proportional epsilon distance
+    of configurations in df_B. The epsilon is calculated as a percentage of the norm of the configuration.
+
+    Args:
+        df_B (pd.DataFrame): The target dataset containing configurations to find matches for.
+        df_A (pd.DataFrame): The reference dataset containing configurations to compare against.
+        epsilon_percentage (float): The percentage of the norm used to determine the search radius.
+        original_df (pd.DataFrame, optional): The original dataset to use for mc_config if provided. Defaults to None.
+
+    Returns:
+        dict: A dictionary containing the results of the matching process, including:
+            - data: A list of dictionaries with matched configurations and their details.
+            - epsilon: The epsilon percentage used for matching.
+            - method: The method used for matching ("norm").
+    """
     dataset_A = df_A.to_numpy()
     dataset_B = df_B.to_numpy()
     tree = KDTree(dataset_A)
@@ -78,33 +108,46 @@ def find_similar_configs_old(df_B, df_A, epsilon_percentage, original_df=None):
         indices = tree.query_ball_point(config, r=proportional_epsilon)
         if indices:
             closest_idx = min(indices, key=lambda i: np.linalg.norm(dataset_A[i] - config))
-            # Use original_df if provided, otherwise use df_A
             mc_config_dict = original_df.iloc[closest_idx].to_dict() if original_df is not None else df_A.iloc[closest_idx].to_dict()
             results.append({
-                "opt_config": df_B.iloc[i].to_dict(),  # Query configuration with column names
-                "mc_config": mc_config_dict,           # Matched configuration with column names
-                "closest_idx": closest_idx,            # Index of the closest match
-                "has_match": True                     # Match status
+                "opt_config": df_B.iloc[i].to_dict(),
+                "mc_config": mc_config_dict,
+                "closest_idx": closest_idx,
+                "has_match": True
             })
         else:
             results.append({
-                "opt_config": df_B.iloc[i].to_dict(),  # Query configuration with column names
-                "mc_config": None,                     # No match found
-                "closest_idx": None,                  # No index
-                "has_match": False                   # Match status
+                "opt_config": df_B.iloc[i].to_dict(),
+                "mc_config": None,
+                "closest_idx": None,
+                "has_match": False
             })
-    return results
+    return {"data": results, "epsilon": epsilon_percentage, "method": "norm"}
 
-def match_results_analyer(match_results): 
+
+def match_results_analyer(match_results):
+    """
+    Analyzes the results of configuration matching and saves the differences to a CSV file.
+
+    This function calculates the differences between matched configurations and saves the results
+    to a CSV file. It uses factor ranges from a JSON file to normalize differences where applicable.
+
+    Args:
+        match_results (dict): The results of the configuration matching process, as returned by
+                             `find_similar_configs` or `find_similar_configs_old`.
+
+    Returns:
+        None: The function saves the results to a CSV file and prints the output path.
+    """
     with open("./datasets/hmtfactor_config.json", "r") as file:
         factors = json.load(file)
     with open("./datasets/metrics.json", "r") as file:
         metrics = json.load(file)
-    output_csv_path = "./ImprovedDataToMCMatches/match_results/opt_mc_difference.csv"
+    output_csv_path = f"./ImprovedDataToMCMatches/match_results/opt_mc_difference_{match_results['method']}_{match_results['epsilon']}_.csv"
     # Convert DataFrame to a list of dictionaries
-    match_results = match_results.to_dict(orient='records')
-    match_results = [match for match in match_results if match["Has_Match"] == True]
-    print(f"Total matches {len(match_results)}")
+    match_results = match_results["data"]
+    match_results = [match for match in match_results if match["has_match"] == True]
+    print(f"Total matches: {len(match_results)}")
     results = []
 
     for row in match_results:
@@ -150,7 +193,85 @@ def match_results_analyer(match_results):
     results_df.to_csv(output_csv_path, index=False)
     print(f"Results saved to {output_csv_path}")
 
+def validate_configurations(results_to_verify, FTG_threshold=0.01):
+    """
+    Validates configurations between an optimized dataset and a Model Checker dataset.
 
+    This function takes the results of a configuration matching process (from `find_similar_configs`)
+    and validates the SCS and FTG parameters for each matched configuration. It calculates the
+    success percentage of valid configurations based on the validation criteria.
 
-# match_results = pd.read_csv("./ImprovedDataToMCMatches/match_results/match_results_0.5.csv")
-# match_results_analyer(match_results)
+    Args:
+        results_to_verify (dict): The results of the configuration matching process, as returned by
+                                 `find_similar_configs`. It should contain a "data" key with a list
+                                 of matched configurations.
+        FTG_threshold (float, optional): The threshold for validating the FTG parameter. Defaults to 0.01.
+
+    Returns:
+        dict: A dictionary containing the validation results, including:
+            - total_comparisons (int): Total number of comparisons made.
+            - invalid_count (int): Number of invalid configurations.
+            - success_percentage (float): Percentage of valid configurations (rounded to 2 decimal places).
+    """
+    validity_array = []
+
+    def validate_scs(opt_SCS, mc_SCS):
+        """
+        Validate the SCS parameter.
+
+        Args:
+            opt_SCS (float): The SCS value from the optimized configuration.
+            mc_SCS (float): The SCS value from the Model Checker configuration.
+
+        Returns:
+            bool: True if the SCS values are valid, False otherwise.
+        """
+        if opt_SCS > 0.9:
+            return bool(mc_SCS)
+        else:
+            return not bool(mc_SCS)
+
+    def validate_ftg(mc_ftg, opt_ftg, threshold=FTG_threshold):
+        """
+        Validate the FTG parameter.
+
+        Args:
+            mc_ftg (float): The FTG value from the Model Checker configuration.
+            opt_ftg (float): The FTG value from the optimized configuration.
+            threshold (float, optional): The threshold for validating the FTG parameter. Defaults to FTG_threshold.
+
+        Returns:
+            bool: True if the FTG values are valid, False otherwise.
+        """
+        if mc_ftg == 0 and opt_ftg == 0:
+            return True
+        elif mc_ftg == 0 or opt_ftg == 0:
+            return abs(mc_ftg - opt_ftg) <= threshold
+        else:
+            return abs(mc_ftg - opt_ftg) / max(abs(mc_ftg), abs(opt_ftg)) <= threshold
+
+    # Iterate through the results and validate each configuration
+    for result in results_to_verify["data"]:
+        if result["has_match"]:
+            opt_SCS = result["opt_config"]["SCS"]
+            mc_SCS = result["mc_config"]["SCS"]
+            validity = validate_scs(opt_SCS, mc_SCS)
+
+            # Validate FTG parameter
+            mc_ftg = result["mc_config"]["FTG_HUM_1"]
+            opt_ftg = result["opt_config"]["FTG"]
+            validity = validity and validate_ftg(mc_ftg, opt_ftg, FTG_threshold)
+            validity_array.append(validity)
+
+    # Calculate validation metrics
+    invalid_count = sum(not v for v in validity_array)
+    if(len(validity_array) == 0):
+        success_percentage = 0
+    else:
+        success_percentage = round(1 - (invalid_count / len(validity_array)), 2)
+
+    return {
+        "total_comparisons": len(validity_array),
+        "invalid_count": invalid_count,
+        "success_percentage": success_percentage
+    }

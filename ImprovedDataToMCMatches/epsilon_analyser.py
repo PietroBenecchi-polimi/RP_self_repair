@@ -19,10 +19,10 @@ matches = find_similar_configs(optimized_set, model_checker_set, epsilon_percent
 
 # Prepare results for CSV
 results = []
-for i, result in enumerate(matches):
+for i, result in enumerate(matches["data"]):
     results.append({
         "Configuration_ID": i,  # Configuration ID (index from query dataset)
-        "Has_Match": result["has_match"],  # Boolean indicating whether a match was found
+        "has_match": result["has_match"],  # Boolean indicating whether a match was found
         "mc_config": result["mc_config"],
         "opt_config": result["opt_config"]
     })
@@ -36,7 +36,7 @@ results_df.to_csv("./ImprovedDataToMCMatches/match_results/" + file_name, index=
 
 # Calculate statistics
 total_data = len(results)
-num_misses = results_df["Has_Match"].value_counts().get(False, 0)
+num_misses = results_df["has_match"].value_counts().get(False, 0)
 percentage_misses = (num_misses / total_data) * 100
 
 # Append statistics to epsilon_data.txt
