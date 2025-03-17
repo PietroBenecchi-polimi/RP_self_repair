@@ -151,17 +151,11 @@ def match_results_analyer(match_results):
     results = []
 
     for row in match_results:
-        try:
-            opt_conf = ast.literal_eval(row.get("opt_config", "{}"))
-            mc_conf = ast.literal_eval(row.get("mc_config", "{}"))
-            match_id = row.get("Configuration_ID")
-        except (ValueError, SyntaxError) as e:
-            continue
-
+        opt_conf = row["opt_config"]
+        mc_conf = row["mc_config"]
+        row_result = {}
         if not mc_conf:
             continue
-
-        row_result = {"id": match_id}
 
         # Calculate differences for each factor key
         for factor_key in mc_conf.keys():
@@ -258,7 +252,7 @@ def validate_configurations(results_to_verify, FTG_threshold=0.01):
             validity = validate_scs(opt_SCS, mc_SCS)
 
             # Validate FTG parameter
-            mc_ftg = result["mc_config"]["FTG_HUM_1"]
+            mc_ftg = result["mc_config"]["FTG"]
             opt_ftg = result["opt_config"]["FTG"]
             validity = validity and validate_ftg(mc_ftg, opt_ftg, FTG_threshold)
             validity_array.append(validity)
