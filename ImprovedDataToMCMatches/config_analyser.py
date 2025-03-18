@@ -239,10 +239,8 @@ def validate_configurations(results_to_verify, FTG_threshold=0.01):
         """
         if mc_ftg == 0 and opt_ftg == 0:
             return True
-        elif mc_ftg == 0 or opt_ftg == 0:
-            return abs(mc_ftg - opt_ftg) <= threshold
         else:
-            return abs(mc_ftg - opt_ftg) / max(abs(mc_ftg), abs(opt_ftg)) <= threshold
+            return abs(mc_ftg - opt_ftg) <= threshold
 
     # Iterate through the results and validate each configuration
     for result in results_to_verify["data"]:
