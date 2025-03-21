@@ -15,6 +15,8 @@ def generate_data(epsilons, ftg_epsilons):
     for epsilon in epsilons:
         # Find similar configurations
         results = find_similar_configs(optimized_set, parsed_mc_set, epsilon)
+        results_df = pd.DataFrame(results["data"])
+        results_df.to_csv(f"./ImprovedDataToMCMatches/match_results/matches_{epsilon}.csv")
         num_results = len(results["data"])
         similar_configs = len([result for result in results["data"] if result["has_match"] == True])
         misses = num_results - similar_configs
