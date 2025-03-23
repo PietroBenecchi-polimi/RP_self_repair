@@ -5,9 +5,8 @@ import os
 
 def generate_data(epsilons, ftg_epsilons):
     # Load datasets
-    optimized_set = pd.read_csv("./datasets/configurations_improved_20_20.csv")  # Query dataset
-    parsed_mc_set = pd.read_csv("./ImprovedDataToMCMatches/refinedData/transformed_dataset.csv")  # Reference dataset
-    mc_set = pd.read_csv("./datasets/initial_configurations_to_improve.csv")
+    optimized_set = pd.read_csv("./datasets/configurations_improved_20_20.csv") 
+    parsed_mc_set = pd.read_csv("./Matching_and_verifier/refinedData/transformed_dataset.csv")  
 
     total_data = []
 
@@ -16,7 +15,7 @@ def generate_data(epsilons, ftg_epsilons):
         # Find similar configurations
         results = find_similar_configs(optimized_set, parsed_mc_set, epsilon)
         results_df = pd.DataFrame(results["data"])
-        results_df.to_csv(f"./ImprovedDataToMCMatches/match_results/matches_{epsilon}.csv")
+        results_df.to_csv(f"./Matching_and_verifier/match_results/matches_{epsilon}.csv")
         num_results = len(results["data"])
         similar_configs = len([result for result in results["data"] if result["has_match"] == True])
         misses = num_results - similar_configs
@@ -37,17 +36,18 @@ def generate_data(epsilons, ftg_epsilons):
                 "Wrong Predictions": data['invalid_count'],
                 "Total Comparisons": data['total_comparisons'],
                 "Success Percentage": data['success_percentage']
+
             })
         total_data.append(results_data)
         results_df = pd.DataFrame(results_data)
         # Save the results to a CSV file
-        results_df.to_csv(f"./ImprovedDataToMCMatches/verifier_results/analysis_results_{epsilon}.csv")
+        results_df.to_csv(f"./Matching_and_verifier/verifier_results/analysis_results_{epsilon}.csv")
         print(f"Analysis of {epsilon} completed and saved as analysis_results_{epsilon}.csv")
 
     print("Analysis complete. Results saved to the verifier_results folder.")
 
 def create_plot(epsilons, ftg_epsilons):
-    folder_path = "./ImprovedDataToMCMatches/verifier_results"
+    folder_path = "./Matching_and_verifier/verifier_results"
 
     # Initialize a figure
     plt.figure(figsize=(10, 6))
@@ -77,7 +77,7 @@ def create_plot(epsilons, ftg_epsilons):
     plt.grid(True)
 
     # Save the plot as an image
-    output_file = "./ImprovedDataToMCMatches/verifier_results/error_percentage_vs_epsilon_all_ftg.png"
+    output_file = "./Matching_and_verifier/verifier_results/error_percentage_vs_epsilon_all_ftg.png"
     plt.savefig(output_file, dpi=300, bbox_inches='tight')  # Save as PNG with high resolution
     print(f"Plot saved to {output_file}")
 

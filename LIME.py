@@ -7,18 +7,17 @@ import ast
 import os
 
 def explain_prediction_with_lime(csv_path, model_path, num_features):
-    # Crea la cartella se non esiste già
+    # create path 
     output_dir = "lime_explanations"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    print("Directory corrente:", os.getcwd())
+
     # Load the dataset
     df = pd.read_csv(csv_path)
-    # Convertire la colonna 'opt_config' da stringa a dizionario
+    # Convert the string representation of the dictionary to a dictionary
     df["opt_config"] = df["opt_config"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-
-    # Espandere il dizionario in colonne separate
     df = df["opt_config"].apply(pd.Series)
+
     X = df.drop(columns=['SCS', 'FTG'])
     y = df['SCS']
     # Get feature names
@@ -27,7 +26,7 @@ def explain_prediction_with_lime(csv_path, model_path, num_features):
     model.predict(X)
     print(f"Loaded model from: {model_path}")
 
-    # Create a prediction function that returns the right shape
+    # create a prediction function that returns the prediction of the model
     def predict_fn(instances):
         return model.predict(pd.DataFrame(instances, columns=feature_names))
     # https://lime-ml.readthedocs.io/en/latest/lime.html?highlight=limetabularexplainer#lime.lime_tabular.LimeTabularExplainer
@@ -54,13 +53,13 @@ def explain_prediction_with_lime(csv_path, model_path, num_features):
         # Store explanation
         explanations.append(explanation)
         
-        # Display the feature contributions
+        # Display the feature contributions: Can be cancelled
         print(f"Feature contributions for instance {instance_index}:")
         for feature, weight in explanation.as_list():
             print(f" {feature}: {weight:.4f}")
         
-        # Plot the explanation if requested
-        if output_path:
+        # Save image into directory
+        if output_dir:
             print(f"Saving explanation plot for instance {instance_index}...")
             plt.figure(figsize=(10, 6))
             explanation.as_pyplot_figure()
@@ -72,7 +71,7 @@ def explain_prediction_with_lime(csv_path, model_path, num_features):
     return explanations
 
 if __name__ == "__main__":
-    csv_path = "ImprovedDataToMCMatches/match_results/matches_0.1.csv"
+    csv_path = "Matching_and_verifier/match_results/matches_0.1.csv"
     model_path = "regressor_SCS.joblib"
-    # Mostrare i primi risultati
+    
     explain_prediction_with_lime(csv_path, model_path, num_features=20)

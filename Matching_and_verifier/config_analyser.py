@@ -144,7 +144,7 @@ def match_results_analyer(match_results):
         factors = json.load(file)
     with open("./datasets/metrics.json", "r") as file:
         metrics = json.load(file)
-    output_csv_path = f"./ImprovedDataToMCMatches/match_results/opt_mc_difference_{match_results['method']}_{match_results['epsilon']}_.csv"
+    output_csv_path = f"./Matching_and_verifier/match_results/opt_mc_difference_{match_results['method']}_{match_results['epsilon']}_.csv"
     # Convert DataFrame to a list of dictionaries
     match_results = match_results["data"]
     match_results = [match for match in match_results if match["has_match"] == True]
@@ -243,6 +243,7 @@ def validate_configurations(results_to_verify, FTG_threshold=0.01):
         else:
             return abs(mc_ftg - opt_ftg) <= threshold
 
+    data_list = []
     # Iterate through the results and validate each configuration
     for result in results_to_verify["data"]:
         if result["has_match"]:
@@ -254,8 +255,16 @@ def validate_configurations(results_to_verify, FTG_threshold=0.01):
             mc_ftg = result["mc_config"]["FTG"]
             opt_ftg = result["opt_config"]["FTG"]
             validity = validity and validate_ftg(mc_ftg, opt_ftg, FTG_threshold)
-            validity_array.append(validity)
 
+            if not validity:
+                data_list.append({
+                    "opt_config": result["opt_config"],
+                    "validity": validity
+                })
+            validity_array.append(validity)
+    
+    df = pd.DataFrame(data_list)
+    df.to_csv(f"./Matching_and_verifier/verifier_results/invalid_configs.csv")
     # Calculate validation metrics
     invalid_count = sum(not v for v in validity_array)
     if(len(validity_array) == 0):
