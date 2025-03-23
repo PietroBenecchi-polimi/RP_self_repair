@@ -5,9 +5,28 @@ import joblib
 import matplotlib.pyplot as plt
 import ast
 import os
+import numpy as np
 
-def explain_prediction_with_lime(csv_path, model_path, num_features):
-    # create path 
+def save_lime_explanation_plot(explanation, instance_index, output_dir):
+    """
+    Saves the LIME explanation plot for a given instance.
+
+    Parameters:
+    - explanation: The LIME explanation object.
+    - instance_index: The index of the instance being explained.
+    - output_dir: The directory where the plot will be saved.
+    """
+    if output_dir:
+        print(f"Saving explanation plot for instance {instance_index}...")
+        plt.figure(figsize=(10, 6))
+        explanation.as_pyplot_figure()
+        plt.tight_layout()
+        plt.title(f"LIME Explanation for Instance {instance_index}")
+        plt.savefig(os.path.join(output_dir, f"lime_explanation_{instance_index}.png"))
+        plt.close()
+
+def explain_prediction_with_lime(csv_path, model_path, num_features, plot_explanations=False):
+    # Create path 
     output_dir = "lime_explanations"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -26,18 +45,19 @@ def explain_prediction_with_lime(csv_path, model_path, num_features):
     model.predict(X)
     print(f"Loaded model from: {model_path}")
 
-    # create a prediction function that returns the prediction of the model
+    # Create a prediction function that returns the prediction of the model
     def predict_fn(instances):
         return model.predict(pd.DataFrame(instances, columns=feature_names))
-    # https://lime-ml.readthedocs.io/en/latest/lime.html?highlight=limetabularexplainer#lime.lime_tabular.LimeTabularExplainer
+
     explainer = lime_tabular.LimeTabularExplainer(
-        training_data = np.array(X), # Dataset di addestramento senza target
-        mode = "regression", # "classification" o "regression"
-        feature_names=feature_names, # Nomi delle feature
+        training_data = np.array(X), # Training dataset without target
+        mode = "regression", # "classification" or "regression"
+        feature_names=feature_names, # Feature names
     )
 
     explanations = []
-    for instance_index in range(1):
+    explanation_dicts = []
+    for instance_index in range(0, max(0, len(X))):
         print(f"\nExplaining instance {instance_index + 1}/{len(X)}...")
         
         # Get the instance to explain
@@ -55,23 +75,21 @@ def explain_prediction_with_lime(csv_path, model_path, num_features):
         
         # Display the feature contributions: Can be cancelled
         print(f"Feature contributions for instance {instance_index}:")
+        explanation_dict = {}
         for feature, weight in explanation.as_list():
-            print(f" {feature}: {weight:.4f}")
-        
-        # Save image into directory
-        if output_dir:
-            print(f"Saving explanation plot for instance {instance_index}...")
-            plt.figure(figsize=(10, 6))
-            explanation.as_pyplot_figure()
-            plt.tight_layout()
-            plt.title(f"LIME Explanation for Instance {instance_index}")
-            plt.savefig(os.path.join(output_dir, f"lime_explanation_{instance_index}.png"))
-            plt.close()
-
-    return explanations
+            feature_name = [name for name in feature.split() if name in feature_names][0]
+            explanation_dict[feature_name] = weight
+        explanation_dicts.append(explanation_dict)
+        # Save plot if requested
+        if plot_explanations:
+            save_lime_explanation_plot(explanation, instance_index, output_dir)
+    return explanation_dicts
 
 if __name__ == "__main__":
-    csv_path = "Matching_and_verifier/match_results/matches_0.1.csv"
+    file_name = "invalid_config_0.17_0.01"
+    csv_path = f"./Matching_and_verifier/invalid_configs/{file_name}.csv"
     model_path = "regressor_SCS.joblib"
     
-    explain_prediction_with_lime(csv_path, model_path, num_features=20)
+    explainations = explain_prediction_with_lime(csv_path, model_path, num_features=20, plot_explanations=False)
+    explainations_df = pd.DataFrame(explainations)
+    explainations_df.to_csv(f"./lime_explanations/{file_name}.csv")

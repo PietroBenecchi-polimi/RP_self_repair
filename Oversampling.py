@@ -79,7 +79,7 @@ def lime_based_resampling(X, explanations, instance_to_oversampling, scale_facto
 
 def main():
     # Ottieni le spiegazioni LIME
-    csv_path = "Matching_and_verifier/verifier_results/invalid_configs.csv"
+    csv_path = "./Matching_and_verifier/verifier_results/invalid_conifigs/"
     model_path = "regressor_SCS.joblib"
     explanations = explain_prediction_with_lime(csv_path, model_path, num_features=20)
     X = pd.read_csv(csv_path)

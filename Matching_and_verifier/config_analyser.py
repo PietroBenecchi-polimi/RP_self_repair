@@ -256,15 +256,11 @@ def validate_configurations(results_to_verify, FTG_threshold=0.01):
             opt_ftg = result["opt_config"]["FTG"]
             validity = validity and validate_ftg(mc_ftg, opt_ftg, FTG_threshold)
 
-            if not validity:
-                data_list.append({
+            data_list.append({
                     "opt_config": result["opt_config"],
-                    "validity": validity
+                    "valid": validity
                 })
             validity_array.append(validity)
-    
-    df = pd.DataFrame(data_list)
-    df.to_csv(f"./Matching_and_verifier/verifier_results/invalid_configs.csv")
     # Calculate validation metrics
     invalid_count = sum(not v for v in validity_array)
     if(len(validity_array) == 0):
@@ -273,6 +269,7 @@ def validate_configurations(results_to_verify, FTG_threshold=0.01):
         success_percentage = round(1 - (invalid_count / len(validity_array)), 2)
 
     return {
+        "total_data": data_list,
         "total_comparisons": len(validity_array),
         "invalid_count": invalid_count,
         "success_percentage": success_percentage

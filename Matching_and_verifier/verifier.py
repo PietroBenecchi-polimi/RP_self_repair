@@ -36,8 +36,9 @@ def generate_data(epsilons, ftg_epsilons):
                 "Wrong Predictions": data['invalid_count'],
                 "Total Comparisons": data['total_comparisons'],
                 "Success Percentage": data['success_percentage']
-
             })
+            data_df = pd.DataFrame([data for data in data['total_data'] if data['valid'] == False])
+            data_df.to_csv(f"./Matching_and_verifier/invalid_configs/invalid_config_{epsilon}_{ftg_epsilon}.csv")
         total_data.append(results_data)
         results_df = pd.DataFrame(results_data)
         # Save the results to a CSV file
