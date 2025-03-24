@@ -9,35 +9,16 @@ from scipy.spatial import KDTree
 
 import json
 
-def find_similar_configs(df_A, df_B, epsilon_percentage, original_df=None):
-    """
-    Finds similar configurations between two datasets (df_A and df_B) based on a given epsilon percentage.
-
-    This function compares configurations in df_B with those in df_A. A configuration in df_B is considered
-    similar to a configuration in df_A if the difference between their factor values is within the specified
-    epsilon percentage of the range of the factor.
-
-    Args:
-        df_A (pd.DataFrame): The reference dataset containing configurations to compare against.
-        df_B (pd.DataFrame): The target dataset containing configurations to find matches for.
-        epsilon_percentage (float): The percentage of the factor range used to determine similarity.
-        original_df (pd.DataFrame, optional): The original dataset to use for mc_config if provided. Defaults to None.
-
-    Returns:
-        dict: A dictionary containing the results of the matching process, including:
-            - data: A list of dictionaries with matched configurations and their details.
-            - epsilon: The epsilon percentage used for matching.
-            - method: The method used for matching ("factor_difference").
-    """
+def find_similar_configs(mc_df, opt_df, epsilon_percentage, original_df=None):
     with open("./datasets/hmtfactor_config.json", "r") as file:
         factors = json.load(file)
     
-    dataset_A = df_A.to_dict(orient="records")
-    dataset_B = df_B.to_dict(orient="records")
+    mc_dataset = mc_df.to_dict(orient="records")
+    opt_dataset = opt_df.to_dict(orient="records")
     results = []
     
-    for _, opt_config in enumerate(dataset_A):
-        for mc_idx, mc_config in enumerate(dataset_B):
+    for opt_config in opt_dataset:
+        for mc_idx, mc_config in enumerate(mc_dataset):
             valid = True
             for factor_key in opt_config.keys():
                 if factor_key not in mc_config:
@@ -66,7 +47,7 @@ def find_similar_configs(df_A, df_B, epsilon_percentage, original_df=None):
             if valid:
                 results.append({
                     "opt_config": opt_config,
-                    "mc_config": (dataset_A[mc_idx] if original_df is None else original_df.iloc[mc_idx].to_dict()),
+                    "mc_config": (mc_dataset[mc_idx] if original_df is None else original_df.iloc[mc_idx].to_dict()),
                     "has_match": True
                 })
                 break
@@ -80,16 +61,16 @@ def find_similar_configs(df_A, df_B, epsilon_percentage, original_df=None):
     return {"data": results, "epsilon": epsilon_percentage, "method": "factor_difference"}
 
 
-def find_similar_configs_old(df_B, df_A, epsilon_percentage, original_df=None):
+def find_similar_configs_old(opt_df, mc_df, epsilon_percentage, original_df=None):
     """
-    Finds similar configurations between two datasets (df_B and df_A) using a KDTree-based approach.
+    Finds similar configurations between two datasets (opt_df and mc_df) using a KDTree-based approach.
 
-    This function uses a KDTree to find configurations in df_A that are within a proportional epsilon distance
-    of configurations in df_B. The epsilon is calculated as a percentage of the norm of the configuration.
+    This function uses a KDTree to find configurations in mc_df that are within a proportional epsilon distance
+    of configurations in opt_df. The epsilon is calculated as a percentage of the norm of the configuration.
 
     Args:
-        df_B (pd.DataFrame): The target dataset containing configurations to find matches for.
-        df_A (pd.DataFrame): The reference dataset containing configurations to compare against.
+        opt_df (pd.DataFrame): The target dataset containing configurations to find matches for.
+        mc_df (pd.DataFrame): The reference dataset containing configurations to compare against.
         epsilon_percentage (float): The percentage of the norm used to determine the search radius.
         original_df (pd.DataFrame, optional): The original dataset to use for mc_config if provided. Defaults to None.
 
@@ -99,26 +80,26 @@ def find_similar_configs_old(df_B, df_A, epsilon_percentage, original_df=None):
             - epsilon: The epsilon percentage used for matching.
             - method: The method used for matching ("norm").
     """
-    dataset_A = df_A.to_numpy()
-    dataset_B = df_B.to_numpy()
-    tree = KDTree(dataset_A)
+    mc_dataset = mc_df.to_numpy()
+    opt_dataset = opt_df.to_numpy()
+    tree = KDTree(mc_dataset)
     results = []
-    for i, config in enumerate(dataset_B):
+    for i, config in enumerate(opt_dataset):
         norm_config = np.linalg.norm(config)
         proportional_epsilon = epsilon_percentage * norm_config
         indices = tree.query_ball_point(config, r=proportional_epsilon)
         if indices:
-            closest_idx = min(indices, key=lambda i: np.linalg.norm(dataset_A[i] - config))
-            mc_config_dict = original_df.iloc[closest_idx].to_dict() if original_df is not None else df_A.iloc[closest_idx].to_dict()
+            closest_idx = min(indices, key=lambda i: np.linalg.norm(mc_dataset[i] - config))
+            mc_config_dict = original_df.iloc[closest_idx].to_dict() if original_df is not None else mc_df.iloc[closest_idx].to_dict()
             results.append({
-                "opt_config": df_B.iloc[i].to_dict(),
+                "opt_config": opt_df.iloc[i].to_dict(),
                 "mc_config": mc_config_dict,
                 "closest_idx": closest_idx,
                 "has_match": True
             })
         else:
             results.append({
-                "opt_config": df_B.iloc[i].to_dict(),
+                "opt_config": opt_df.iloc[i].to_dict(),
                 "mc_config": None,
                 "closest_idx": None,
                 "has_match": False

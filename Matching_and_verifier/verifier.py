@@ -13,7 +13,7 @@ def generate_data(epsilons, ftg_epsilons):
     # For each epsilon, find similar configurations and validate
     for epsilon in epsilons:
         # Find similar configurations
-        results = find_similar_configs(optimized_set, parsed_mc_set, epsilon)
+        results = find_similar_configs(parsed_mc_set, optimized_set, epsilon)
         results_df = pd.DataFrame(results["data"])
         results_df.to_csv(f"./Matching_and_verifier/match_results/matches_{epsilon}.csv")
         num_results = len(results["data"])
@@ -89,12 +89,8 @@ def main():
     choice = input("Enter your choice (1 or 2): ")
 
     # Allow the user to input epsilons and ftg_epsilons
-    epsilons_input = input("Enter epsilon values (comma-separated, e.g., 0.2,0.185,0.17): ")
-    ftg_epsilons_input = input("Enter FTG epsilon values (comma-separated, e.g., 1,0.1,0.05): ")
-
-    # Convert inputs to lists of floats
-    epsilons = [float(e) for e in epsilons_input.split(",")]
-    ftg_epsilons = [float(f) for f in ftg_epsilons_input.split(",")]
+    epsilons = [0.2,0.185,0.18,0.175,0.17,0.165]
+    ftg_epsilons = [1,0.01,0.005]
 
     if choice == '1':
         generate_data(epsilons, ftg_epsilons)
