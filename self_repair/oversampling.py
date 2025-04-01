@@ -13,7 +13,7 @@ def smote_oversampling(X):
     df = df["opt_config"].apply(pd.Series)
     
     df_resampled = smogn.smoter(data=df, y='SCS')
-         
+    
     return df_resampled
 
 def random_oversampling(X, n_samples):
