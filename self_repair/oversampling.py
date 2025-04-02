@@ -7,22 +7,14 @@ import smogn
 
 # Synthetic Minority Over-Sampling Technique for Regression with Gaussian Noise 
 #https://github.com/nickkunz/smogn?tab=readme-ov-file
-def smote_oversampling(X):
-    df = X.copy()
-    df["opt_config"] = df["opt_config"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-    df = df["opt_config"].apply(pd.Series)
-    
+def smote_oversampling(df):
     df_resampled = smogn.smoter(data=df, y='SCS')
-    
+    df_resampled = pd.DataFrame(df_resampled)
     return df_resampled
 
-def random_oversampling(X, n_samples):
+def random_oversampling(df, n_samples):
     synthetic_data = {}
-    
-    df = X.copy()
-    df["opt_config"] = df["opt_config"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-    df = df["opt_config"].apply(pd.Series)
-    
+        
     for column in df.columns:
         col_min, col_max = df[column].min(), df[column].max()
         synthetic_data[column] = np.random.uniform(col_min, col_max, n_samples)
