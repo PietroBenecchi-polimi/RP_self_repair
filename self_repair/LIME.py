@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import ast
 import os
 import numpy as np
-
+import sys
 def save_lime_explanation_plot(explanation, instance_index, output_dir):
     """
     Saves the LIME explanation plot for a given instance.
@@ -26,7 +26,7 @@ def save_lime_explanation_plot(explanation, instance_index, output_dir):
         plt.close()
 
 def explain_prediction_with_lime(csv_path, model_path, num_features, plot_explanations=False):
-    # Create path 
+    # Create path
     output_dir = "lime_explanations"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -86,7 +86,7 @@ def explain_prediction_with_lime(csv_path, model_path, num_features, plot_explan
     return explanation_dicts
 
 if __name__ == "__main__":
-    file_name = "invalid_config_0.17_0.01"
+    file_name = sys.argv[0]
     csv_path = f"./Matching_and_verifier/invalid_configs/{file_name}.csv"
     model_path = "regressor_SCS.joblib"
     
