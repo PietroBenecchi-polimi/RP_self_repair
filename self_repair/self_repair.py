@@ -4,6 +4,10 @@ from oversampling import random_oversampling, lime_based_resampling, smote_overs
 from validation import validate_configurations
 import sys
 import os
+import warnings
+from sklearn.exceptions import InconsistentVersionWarning
+
+warnings.simplefilter("ignore", InconsistentVersionWarning)
 
 sys.path.append(os.path.abspath("utils"))
 from rp_logger import logger
@@ -69,8 +73,8 @@ def oversampling_methods(invalid_config, n_samples=100):
 # 4. Validation function
 def main():
     # Read and upload files
-    ground_truth = "regressor_SCS.joblib"
-    regressor_path = "regressor_SCS_LIME_100.joblib"
+    ground_truth = "self_repair/regressor/regressor_SCS.joblib"
+    regressor_path = "self_repair/regressor/regressor_SCS_LIME_100.joblib"
 
     invalid_config, regressor = upload_samples_and_regressor(ground_truth=ground_truth, regressor=regressor_path, samples='datasets/transformed_dataset.csv')
 
@@ -89,9 +93,11 @@ def main():
            "method": new_samples.get("method"),
            "success_percentage": success_percentage
         })
-    
-    logger.log(stats)
-    logger.log("Best resampling method is: ", max(stats, key=lambda x: x['success_percentage']), "YUPPY!")
+    for stat in stats:
+        msg = f"{stat['method']}: {stat['success_percentage']}"
+        logger.debug(msg)
+    best_method = max(stats, key=lambda x: x['success_percentage'])
+    logger.debug(f"Best resampling method is: {best_method["method"]} YUPPY!")
     # Restore function, something like early stopping so that I can take the best model
 
 if __name__ == "__main__":
