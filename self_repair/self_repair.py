@@ -1,6 +1,7 @@
 import pandas as pd
 import joblib
 from oversampling import random_oversampling, lime_based_resampling, smote_oversampling
+from validation import validate_configurations
 
 def validate_configurations(opt_config, ground_truth, FTG_threshold=0.01):
     validity_array = []
