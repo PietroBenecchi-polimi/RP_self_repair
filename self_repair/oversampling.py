@@ -21,35 +21,31 @@ def random_oversampling(df, n_samples):
     
     return pd.DataFrame(synthetic_data)
 
-def lime_based_resampling(X, explanations, instance_to_oversampling, scale_factor=1.0):
+def lime_based_resampling(df, regressor):
     """
     Resampling based on LIME explanations.
     """    
-    # Extract feature importances from LIME explanations        
+    df = df.drop(columns=["SCS"])
+    # Extract feature importances from LIME explanations
     new_samples = []
 
-    df = X.copy()
-    df["opt_config"] = df["opt_config"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-    df = df["opt_config"].apply(pd.Series)
+    explanations = explain_prediction_with_lime(df, regressor, num_features=20)
 
-    df = df.drop(columns=['SCS', 'FTG'])
-    
-    for index in range(instance_to_oversampling):
+    for index in range(df.shape[0]):
         new_sample = df.iloc[index].copy()
         print(new_sample)
         # Using index since we have a dataseries, not a dataframe
         for feature in new_sample.keys():
             # Mean in original sample, while variance is the feature importance from LIME
             mean = new_sample[feature]
-            variance = explanations.iloc[index][feature] * scale_factor 
+            variance = explanations.iloc[index][feature]
 
             # minimum variance
             variance = max(variance, 0.01)
             
             # new distribution
             new_value = np.random.normal(mean, np.sqrt(variance))
-            
-    
+        
             new_sample[feature] = new_value
         
         new_samples.append(new_sample)

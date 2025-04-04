@@ -1,11 +1,12 @@
 import pandas as pd
 import joblib
-from oversampling import random_oversampling, lime_based_resampling, smote_oversampling
+from oversampling import lime_based_resampling, random_oversampling
 from validation import validate_configurations
 import sys
 import os
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
+import numpy as np
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 
@@ -43,7 +44,7 @@ def validate_configurations_after_retraining(regressor, ground_truth):
     
     return validate_configurations(data, ground_truth_data, FTG_threshold=0.01)
 
-def oversampling_methods(invalid_config, n_samples=100):
+def oversampling_methods(invalid_config, n_samples=100, regressor=None):
     new_samples_list = []
     # Oversampling methods:
     # 1. Random oversampling
@@ -62,7 +63,17 @@ def oversampling_methods(invalid_config, n_samples=100):
 #    new_samples_list.append(new_samples)
 
     # 3. LIME based oversampling
-    #TODO
+    new_samples_lime = lime_based_resampling(df=invalid_config, regressor=regressor)
+    new_samples_lime['SCS'] = np.random.uniform(
+        low=invalid_config['SCS'].min(), 
+        high=invalid_config['SCS'].max(), 
+        size=new_samples_lime.shape[0]
+    )
+    new_samples = {
+        "method": "LIME_gaussian",
+        "samples": new_samples_lime
+    }
+    new_samples_list.append(new_samples)
 
     return new_samples_list
 
@@ -78,8 +89,8 @@ def main():
 
     invalid_config, regressor = upload_samples_and_regressor(ground_truth=ground_truth, regressor=regressor_path, samples='datasets/transformed_dataset.csv')
 
-    # Oversampling methods
-    new_samples_list = oversampling_methods(invalid_config, n_samples=100)
+    # Oversampling methods: 20 features without SCS and FTG
+    new_samples_list = oversampling_methods(invalid_config, n_samples=100, regressor=regressor)
 
     stats = []
     #Retrain regressor with oversampled data
