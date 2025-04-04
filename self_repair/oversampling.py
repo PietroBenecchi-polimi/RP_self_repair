@@ -33,7 +33,6 @@ def lime_based_resampling(df, regressor):
 
     for index in range(df.shape[0]):
         new_sample = df.iloc[index].copy()
-        print(new_sample)
         # Using index since we have a dataseries, not a dataframe
         for feature in new_sample.keys():
             # Mean in original sample, while variance is the feature importance from LIME

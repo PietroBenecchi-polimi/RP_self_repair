@@ -30,4 +30,4 @@ df1 = df1[df2.columns]
 # Save the transformed dataset to a new CSV file
 df1.to_csv('./ImprovedDataToMCMatches/refinedData/transformed_dataset.csv', index=False)
 
-print("Transformation complete. The transformed dataset is saved as 'transformed_dataset.csv'.")
+logger.debug("Transformation complete. The transformed dataset is saved as 'transformed_dataset.csv'.")

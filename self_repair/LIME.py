@@ -7,6 +7,10 @@ import ast
 import os
 import numpy as np
 import sys
+warnings.simplefilter("ignore", InconsistentVersionWarning)
+
+sys.path.append(os.path.abspath("utils"))
+from rp_logger import logger
 def save_lime_explanation_plot(explanation, instance_index, output_dir):
     """
     Saves the LIME explanation plot for a given instance.
@@ -17,7 +21,7 @@ def save_lime_explanation_plot(explanation, instance_index, output_dir):
     - output_dir: The directory where the plot will be saved.
     """
     if output_dir:
-        print(f"Saving explanation plot for instance {instance_index}...")
+        logger.debug(f"Saving explanation plot for instance {instance_index}...")
         plt.figure(figsize=(10, 6))
         explanation.as_pyplot_figure()
         plt.tight_layout()
