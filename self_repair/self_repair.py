@@ -103,7 +103,7 @@ def main():
         y = ground_truth.predict(X)
         regressor.fit(X, y)
         # Validate results using new and unseen data in training
-        _ , success_percentage, binary_loss = validate_configurations_after_retraining(regressor, ground_truth)
+        success_percentage, binary_loss = validate_configurations_after_retraining(regressor, ground_truth)
         stats.append({
            "method": new_samples.get("method"),
            "success_percentage_improvement": success_percentage - succes_before_training,
@@ -112,9 +112,9 @@ def main():
 
     print(f"Success percentage before retraining: {succes_before_training}")
     for stat in stats:
-        msg = f"{stat['method']}: {stat['success_percentage']}"
+        msg = f"{stat['method']}: {stat['success_percentage_improvement']}"
         logger.debug(msg)
-    best_method = max(stats, key=lambda x: x['success_percentage'])
+    best_method = max(stats, key=lambda x: x['success_percentage_improvement'])
     logger.debug(f"Best resampling method is: {best_method["method"]} YUPPY!")
 
 if __name__ == "__main__":
