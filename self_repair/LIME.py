@@ -7,6 +7,9 @@ import ast
 import os
 import numpy as np
 import sys
+import warnings
+from sklearn.exceptions import InconsistentVersionWarning
+
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 
 sys.path.append(os.path.abspath("utils"))
