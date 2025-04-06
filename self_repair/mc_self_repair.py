@@ -45,7 +45,8 @@ def oversampling_methods(invalid_config, n_samples=100, regressor=None):
     return new_samples_list
 
 if __name__ == "__main__":
-    regressor = joblib.load("self_repair/regressor/regressor_SCS.joblib")
+    scs_regressor = joblib.load("self_repair/regressor/regressor_SCS.joblib")
+    ftg_regressor = joblib.load("self_repair/regressor/regressor_FTG.joblib")
     opt_configs = pd.read_csv("datasets/configurations_improved_20_20.csv")
     opt_samples = categorical_to_numeric(pd.read_csv("datasets/initial_configurations_to_improve.csv")).drop(columns=["SCS", "PRSCS_LB", "PRSCS_UB", "FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
     try:
@@ -59,7 +60,7 @@ if __name__ == "__main__":
     logger.debug(f"Success percentage before oversampling: {success_percentage}")
     stats.append({"method": "base", "success_percentage": success_percentage})
     #Oversampling
-    methods_samples = oversampling_methods(invalid_configs, 100, regressor)
+    methods_samples = oversampling_methods(invalid_configs, 100, scs_regressor)
     for method in methods_samples:
         logger.debug(f"Oversampling via {method['method']}")
         new_samples = method.get("samples").drop(columns=["SCS", "FTG"])
@@ -67,7 +68,7 @@ if __name__ == "__main__":
         #Creates new optimized configurations from the oversampling
         new_samples_results = mc_results_from_configs(new_samples, method["method"])
         #Uses the oversampled configurations to train a new regressor
-        new_opt_configs = opt_optimization(new_samples_results, method["method"])
+        new_opt_configs = opt_optimization(new_samples_results, scs_regressor, ftg_regressor, method["method"])
         #Validates using a new ground truth from the model checker
         new_ground_truth = mc_results_from_configs(new_opt_configs.drop(columns=["SCS", "FTG"]), method["method"])
         invalid_configs, success_percentage = validate_configurations(new_opt_configs, new_ground_truth)
