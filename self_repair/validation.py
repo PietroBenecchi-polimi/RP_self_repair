@@ -1,8 +1,4 @@
 import pandas as pd
-import sys
-import os
-
-sys.path.append(os.path.abspath("utils"))
 from rp_logger import logger
 
 def validate_scs(opt_SCS, mc_SCS, mc_ub=1, mc_lb=0):
@@ -22,14 +18,14 @@ def validate_configurations(opt_results, ground_truth, FTG_threshold=0.005):
     invalid_results = []
 
     # **Pre-check if required columns are present**
-    has_FTG = "FTG" in ground_truth.columns
+    has_FTG = "FTG_HUM_1" in ground_truth.columns
     has_ub_lb = "PRSCS_UB" in ground_truth.columns and "PRSCS_LB" in ground_truth.columns
 
     # Log the findings
     if has_FTG:
-        logger.info("FTG column detected and will be assessed.")
+        logger.info("FTG_HUM_1 column detected and will be assessed.")
     else:
-        logger.warning("FTG column is missing, it will not be assessed.")
+        logger.warning("FTG_HUM_1 column is missing, it will not be assessed.")
 
     if has_ub_lb:
         logger.info("Upper and lower bounds (PRSCS_UB, PRSCS_LB) detected for SCS validation.")
@@ -51,8 +47,8 @@ def validate_configurations(opt_results, ground_truth, FTG_threshold=0.005):
 
         # Validate FTG if available
         if has_FTG:
-            mc_ftg = ground_truth.iloc[i]['FTG']
-            opt_ftg = opt_results.iloc[i]['FTG']
+            mc_ftg = ground_truth.iloc[i]['FTG_HUM_1']
+            opt_ftg = opt_results.iloc[i]['FTG_HUM_1']
             validity = validity and validate_ftg(mc_ftg, opt_ftg, FTG_threshold)
 
         if not validity:

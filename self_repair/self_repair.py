@@ -2,16 +2,12 @@ import pandas as pd
 import joblib
 from oversampling import lime_based_resampling, random_oversampling, smote_oversampling
 from validation import validate_configurations
-import sys
-import os
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 import numpy as np
 from sklearn.metrics import log_loss
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
-
-sys.path.append(os.path.abspath("utils"))
 from rp_logger import logger
 
 def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None, SCS_threshold=0.01):
