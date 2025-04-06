@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.metrics import log_loss
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
-from rp_logger import logger
+from utils.rp_logger import logger
 
 def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None, SCS_threshold=0.01):
     # Upload models

@@ -46,19 +46,19 @@ def oversampling_methods(invalid_config, n_samples=100, regressor=None):
 
     return new_samples_list
 
-def process_oversampling_method(method: Dict, opt_samples: pd.DataFrame, scs_regressor, ftg_regressor) -> Dict:
+def process_oversampling_method(method: Dict, opt_samples: pd.DataFrame, scs_regressor, ftg_regressor, scs_ground_truth_regressor, ftg_ground_truth_regressor) -> Dict:
     logger.debug(f"Oversampling via {method['method']}")
     new_samples = method["samples"]
 
     # Generate MC results
-    new_samples_results = mc_results_from_configs(new_samples, method["method"])
+    new_samples_results = mc_results_from_configs(new_samples, scs_ground_truth_regressor, ftg_ground_truth_regressor)
     oversampling = pd.concat([new_samples_results, opt_samples], ignore_index=True)
 
     # Run NSGA-II
     new_opt_configs_results = opt_optimization(oversampling, scs_regressor, ftg_regressor, method["method"])
     new_opt_configs = new_opt_configs_results.drop(columns=["SCS", "FTG"])
     # Generate ground truth
-    new_ground_truth_results = mc_results_from_configs(new_opt_configs, method["method"])
+    new_ground_truth_results = mc_results_from_configs(new_opt_configs, scs_ground_truth_regressor, ftg_ground_truth_regressor)
 
     # Validation
     _, success_percentage = validate_configurations(new_opt_configs_results, new_ground_truth_results)
@@ -67,16 +67,14 @@ def process_oversampling_method(method: Dict, opt_samples: pd.DataFrame, scs_reg
     return {"method": method["method"], "success_percentage": success_percentage}
 
 if __name__ == "__main__":
-    scs_regressor = joblib.load("self_repair/regressor/regressor_SCS.joblib")
-    ftg_regressor = joblib.load("self_repair/regressor/regressor_FTG.joblib")
+    scs_regressor = joblib.load("self_repair/regressor/regressor_SCS_LIME_100.joblib")
+    ftg_regressor = joblib.load("self_repair/regressor/regressor_FTG_LIME_100.joblib")
     opt_results = pd.read_csv("datasets/configurations_improved_20_20.csv")
     opt_configs = opt_results.drop(columns=["SCS", "FTG"])
     opt_samples = categorical_to_numeric(pd.read_csv("datasets/initial_configurations_to_improve.csv")).drop(columns=["SCS", "PRSCS_LB", "PRSCS_UB", "FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
-    try:
-        ground_truth_results = categorical_to_numeric(pd.read_csv("self_repair/cache/mc/opt_mc_verified.csv"))
-    except FileNotFoundError:
-        logger.warning("Ground truth not found, MC will be used to create one for the given optimized configurations")
-        ground_truth_results = mc_results_from_configs(opt_configs, "ground_truth_results")
+    scs_ground_truth_regressor = joblib.load("self_repair/regressor/regressor_SCS.joblib")
+    ftg_ground_truth_regressor = joblib.load("self_repair/regressor/regressor_FTG.joblib")
+    ground_truth_results = mc_results_from_configs(opt_configs, scs_ground_truth_regressor, ftg_ground_truth_regressor)
     # Calculate accuracy
     stats = []
     invalid_configs, success_percentage = validate_configurations(opt_results, ground_truth_results)

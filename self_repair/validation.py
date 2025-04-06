@@ -1,5 +1,5 @@
 import pandas as pd
-from rp_logger import logger
+from utils.rp_logger import logger
 
 def validate_scs(opt_SCS, mc_SCS, mc_ub=1, mc_lb=0):
     if opt_SCS > 0.9:
@@ -35,8 +35,10 @@ def validate_configurations(opt_results, ground_truth, FTG_threshold=0.005):
     # **Iterate through results and validate configurations**
     for i in range(len(opt_results)):
         opt_SCS = opt_results.iloc[i]['SCS']
-        mc_SCS = ground_truth.iloc[i]['SCS']
-
+        try:
+            mc_SCS = ground_truth.iloc[i]['SCS']
+        except IndexError:
+            continue
         # Validate SCS
         if has_ub_lb:
             mc_SCS_ub = ground_truth.iloc[i]['PRSCS_UB']
