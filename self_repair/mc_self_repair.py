@@ -5,7 +5,6 @@ from validation import validate_configurations
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 import numpy as np
-from sklearn.metrics import log_loss
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 from rp_logger import logger
@@ -50,8 +49,9 @@ if __name__ == "__main__":
     opt_configs = pd.read_csv("datasets/configurations_improved_20_20.csv")
     opt_samples = categorical_to_numeric(pd.read_csv("datasets/initial_configurations_to_improve.csv")).drop(columns=["SCS", "PRSCS_LB", "PRSCS_UB", "FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
     try:
-        ground_truth = categorical_to_numeric(pd.read_csv("datasets/opt_mc_verified.csv"))
+        ground_truth = categorical_to_numeric(pd.read_csv("self_repair/cache/mc/opt_mc_verified.csv"))
     except FileNotFoundError:
+        logger.warning("Gound truth not found, MC will be used to create one for the given optimized configurations")
         ground_truth = mc_results_from_configs(opt_configs.drop(columns=["SCS", "FTG"]))
     # Calculate accuracy
     stats = []
@@ -65,11 +65,11 @@ if __name__ == "__main__":
         new_samples = method.get("samples").drop(columns=["SCS", "FTG"])
         oversampling = pd.concat([new_samples, opt_samples], ignore_index=True)
         #Creates new optimized configurations from the oversampling
-        new_samples_results = mc_results_from_configs(new_samples)
+        new_samples_results = mc_results_from_configs(new_samples, method["method"])
         #Uses the oversampled configurations to train a new regressor
-        new_opt_configs = opt_optimization(new_samples_results)
+        new_opt_configs = opt_optimization(new_samples_results, method["method"])
         #Validates using a new ground truth from the model checker
-        new_ground_truth = mc_results_from_configs(new_opt_configs.drop(columns=["SCS", "FTG"]))
+        new_ground_truth = mc_results_from_configs(new_opt_configs.drop(columns=["SCS", "FTG"]), method["method"])
         invalid_configs, success_percentage = validate_configurations(new_opt_configs, new_ground_truth)
         stats.append({"method": method["method"], "success_percentage": success_percentage})
         logger.debug(f"{method["method"]} oversampling concluded: success percentage: {success_percentage}")
