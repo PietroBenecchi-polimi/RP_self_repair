@@ -1,11 +1,21 @@
 import pandas as pd
-from rp_logger import logger
+import logging
+import numpy as np
+
+# Configure logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 def validate_scs(opt_SCS, mc_SCS, mc_ub=1, mc_lb=0):
-    if opt_SCS > 0.9:
-        return bool(mc_SCS) and mc_SCS <= mc_ub
+    epsilon = np.abs(opt_SCS - mc_SCS)
+    if epsilon < 0.1:
+        return True
     else:
-        return not bool(mc_SCS) and mc_SCS >= mc_lb
+        return False
+#    if opt_SCS > 0.9:
+#        return bool(mc_SCS) and mc_SCS <= mc_ub
+#    else:
+#        return not bool(mc_SCS) and mc_SCS >= mc_lb
 
 def validate_ftg(mc_ftg, opt_ftg, threshold):
     if mc_ftg == 0 and opt_ftg == 0:

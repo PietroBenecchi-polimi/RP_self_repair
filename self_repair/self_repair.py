@@ -64,12 +64,12 @@ def oversampling_methods(invalid_config, n_samples=100, regressor=None):
     }
     new_samples_list.append(new_samples)
     # 2. SMOTE based oversampling
-    new_samples_smote = smote_oversampling(df=invalid_config)
-    new_samples = {
-        "method": "Smote",
-        "samples": new_samples_smote
-   }
-    new_samples_list.append(new_samples)
+#    new_samples_smote = smote_oversampling(df=invalid_config)
+#    new_samples = {
+#        "method": "Smote",
+#        "samples": new_samples_smote
+#   }
+#    new_samples_list.append(new_samples)
 
     # 3. LIME based oversampling
     new_samples_lime = lime_based_resampling(df=invalid_config, regressor=regressor)
