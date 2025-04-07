@@ -32,7 +32,6 @@ def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None
     #Predictions
     sampled_df['SCS'] = regressor.predict(sampled_df)
     ground_truth_data = ground_truth_model.predict(sampled_df)
-    ground_truth_data = [True if result > 0.5 else False for result in ground_truth_data]
     ground_truth_data = pd.DataFrame(ground_truth_data, columns=['SCS'])
 
     invalid_config, success_percantage = validate_configurations(sampled_df, ground_truth_data, FTG_threshold=0.01)
@@ -41,11 +40,10 @@ def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None
     return invalid_config, regressor, ground_truth_model, success_percantage
 
 def validate_configurations_after_retraining(regressor, ground_truth):
-    data = pd.read_csv("datasets\configurations_improved_20_20.csv")
+    data = pd.read_csv("datasets/last_100_rows.csv")
     new_data = data.drop(columns=["SCS", "FTG"])
 
     ground_truth_data = ground_truth.predict(new_data)
-    ground_truth_data = [True if result > 0.5 else False for result in ground_truth_data]
     ground_truth_data = pd.DataFrame(ground_truth_data, columns=['SCS'])
     new_data['SCS'] = regressor.predict(new_data)
     
@@ -65,22 +63,15 @@ def oversampling_methods(invalid_config, n_samples=100, regressor=None):
         "samples": new_samples_random
     }
     new_samples_list.append(new_samples)
+    invalid_config.to_csv("datasets/invalid_config.csv", index=False)
+    invalid_config = pd.read_csv("datasets/invalid_config.csv")
     # 2. SMOTE based oversampling
-<<<<<<< HEAD
-#    new_samples_smote = smote_oversampling(df=invalid_config)
-#    new_samples = {
-#        "method": "Smote",
-#        "samples": new_samples_smote
-#   }
-#    new_samples_list.append(new_samples)
-=======
-#     new_samples_smote = smote_oversampling(df=invalid_config)
-#     new_samples = {
-#         "method": "Smote",
-#         "samples": new_samples_smote
-#    }
-#     new_samples_list.append(new_samples)
->>>>>>> 6cac96c163e9fa4f6b7c200f0fe8cd357ec74c3c
+    new_samples_smote = smote_oversampling(df=invalid_config)
+    new_samples = {
+        "method": "Smote",
+        "samples": new_samples_smote
+   }
+    new_samples_list.append(new_samples)
 
     # 3. LIME based oversampling
     new_samples_lime = lime_based_resampling(df=invalid_config, regressor=regressor)
@@ -107,10 +98,10 @@ def main():
     ground_truth_path = "self_repair/regressor/regressor_SCS.joblib"
     regressor_path = "self_repair/regressor/regressor_SCS_LIME_100.joblib"
 
-    invalid_config, regressor, ground_truth, succes_before_training = upload_samples_and_regressor(ground_truth=ground_truth_path, regressor=regressor_path, samples='datasets/configurations_improved_20_20.csv')
+    invalid_config, regressor, ground_truth, succes_before_training = upload_samples_and_regressor(ground_truth=ground_truth_path, regressor=regressor_path, samples='datasets/first_100_rows.csv')
 
     # Oversampling methods: 20 features without SCS and FTG
-    new_samples_list = oversampling_methods(invalid_config, n_samples=100, regressor=regressor)
+    new_samples_list = oversampling_methods(invalid_config, n_samples=900, regressor=regressor)
 
     stats = []
     #Retrain regressor with oversampled data
@@ -122,7 +113,7 @@ def main():
         success_percentage, binary_loss = validate_configurations_after_retraining(regressor, ground_truth)
         stats.append({
            "method": new_samples.get("method"),
-           "success_percentage_improvement": success_percentage - succes_before_training,
+           "success_percentage_improvement": (success_percentage - succes_before_training) * 100,
             "binary cross loss function": binary_loss,
         })
 
