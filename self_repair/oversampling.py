@@ -6,9 +6,20 @@ import smogn
 # Synthetic Minority Over-Sampling Technique for Regression with Gaussian Noise 
 #https://github.com/nickkunz/smogn?tab=readme-ov-file
 def smote_oversampling(df):
-    df_resampled = smogn.smoter(data=df, y='SCS')
-    df_resampled = pd.DataFrame(df_resampled)
-    return df_resampled
+    relevance = [
+        {"x": 0.0, "y": 1},   # Treat low SCS as rare
+        {"x": 0.5, "y": 0},   # Mid SCS as common
+        {"x": 0.9, "y": 1}    # High SCS as rare too
+    ]
+
+    df_resampled = smogn.smoter(
+        data=df,
+        y='SCS',
+        rel_ctrl_pts_rg=relevance,
+        k=6
+    )
+    return pd.DataFrame(df_resampled)
+
 
 def random_oversampling(df, n_samples):
     synthetic_data = {}

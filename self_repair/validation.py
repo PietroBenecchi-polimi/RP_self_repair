@@ -7,12 +7,6 @@ def validate_scs(opt_SCS, mc_SCS, mc_ub=1, mc_lb=0):
     else:
         return not bool(mc_SCS) and mc_SCS >= mc_lb
 
-def validate_ftg(mc_ftg, opt_ftg, threshold):
-    if mc_ftg == 0 and opt_ftg == 0:
-        return True
-    else:
-        return abs(mc_ftg - opt_ftg) <= threshold
-
 def validate_configurations(opt_results, ground_truth, FTG_threshold=0.005):
     validity_array = []
     invalid_results = []
