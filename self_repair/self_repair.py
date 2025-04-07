@@ -32,6 +32,7 @@ def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None
     #Predictions
     sampled_df['SCS'] = regressor.predict(sampled_df)
     ground_truth_data = ground_truth_model.predict(sampled_df)
+    ground_truth_data = [True if result > 0.5 else False for result in ground_truth_data]
     ground_truth_data = pd.DataFrame(ground_truth_data, columns=['SCS'])
 
     invalid_config, success_percantage = validate_configurations(sampled_df, ground_truth_data, FTG_threshold=0.01)
@@ -44,6 +45,7 @@ def validate_configurations_after_retraining(regressor, ground_truth):
     new_data = data.drop(columns=["SCS", "FTG"])
 
     ground_truth_data = ground_truth.predict(new_data)
+    ground_truth_data = [True if result > 0.5 else False for result in ground_truth_data]
     ground_truth_data = pd.DataFrame(ground_truth_data, columns=['SCS'])
     new_data['SCS'] = regressor.predict(new_data)
     
@@ -64,12 +66,21 @@ def oversampling_methods(invalid_config, n_samples=100, regressor=None):
     }
     new_samples_list.append(new_samples)
     # 2. SMOTE based oversampling
+<<<<<<< HEAD
 #    new_samples_smote = smote_oversampling(df=invalid_config)
 #    new_samples = {
 #        "method": "Smote",
 #        "samples": new_samples_smote
 #   }
 #    new_samples_list.append(new_samples)
+=======
+#     new_samples_smote = smote_oversampling(df=invalid_config)
+#     new_samples = {
+#         "method": "Smote",
+#         "samples": new_samples_smote
+#    }
+#     new_samples_list.append(new_samples)
+>>>>>>> 6cac96c163e9fa4f6b7c200f0fe8cd357ec74c3c
 
     # 3. LIME based oversampling
     new_samples_lime = lime_based_resampling(df=invalid_config, regressor=regressor)
