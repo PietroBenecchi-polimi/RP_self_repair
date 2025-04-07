@@ -54,7 +54,7 @@ def process_oversampling_method(method: Dict, opt_samples: pd.DataFrame, scs_reg
     new_samples_results = mc_results_from_configs(new_samples, scs_ground_truth_regressor, ftg_ground_truth_regressor)
     oversampling = pd.concat([new_samples_results, opt_samples], ignore_index=True)
 
-    # Run NSGA-II
+    # Run NSGA-II - BISOGNA RI-ALLENARE IL REGRESSORE
     new_opt_configs_results = opt_optimization(oversampling, scs_regressor, ftg_regressor, method["method"])
     new_opt_configs = new_opt_configs_results.drop(columns=["SCS", "FTG"])
     # Generate ground truth

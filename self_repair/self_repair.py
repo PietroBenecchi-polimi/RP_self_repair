@@ -18,11 +18,12 @@ def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None
     # Upload samples
     initial_configs = pd.read_csv(samples)
     sampled_df = initial_configs.sample(n=100, random_state=42)
-    sampled_df = initial_configs.drop(columns=["SCS", "FTG"])
+    sampled_df = sampled_df.drop(columns=["SCS", "FTG"])
 
     #Predictions
     sampled_df['SCS'] = regressor.predict(sampled_df)
     ground_truth_data = ground_truth_model.predict(sampled_df)
+    ground_truth_data = [True if result > 0.5 else False for result in ground_truth_data]
     ground_truth_data = pd.DataFrame(ground_truth_data, columns=['SCS'])
 
     invalid_config, success_percantage = validate_configurations(sampled_df, ground_truth_data, FTG_threshold=0.01)
@@ -31,10 +32,11 @@ def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None
     return invalid_config, regressor, ground_truth_model, success_percantage
 
 def validate_configurations_after_retraining(regressor, ground_truth):
-    data = pd.read_csv("datasets/transformed_dataset.csv")
+    data = pd.read_csv("datasets/configurations_improved_20_20.csv")
     new_data = data.drop(columns=["SCS", "FTG"])
 
     ground_truth_data = ground_truth.predict(new_data)
+    ground_truth_data = [True if result > 0.5 else False for result in ground_truth_data]
     ground_truth_data = pd.DataFrame(ground_truth_data, columns=['SCS'])
     new_data['SCS'] = regressor.predict(new_data)
     
@@ -87,7 +89,7 @@ def main():
     ground_truth_path = "self_repair/regressor/regressor_SCS.joblib"
     regressor_path = "self_repair/regressor/regressor_SCS_LIME_100.joblib"
 
-    invalid_config, regressor, ground_truth, succes_before_training = upload_samples_and_regressor(ground_truth=ground_truth_path, regressor=regressor_path, samples='datasets/transformed_dataset.csv')
+    invalid_config, regressor, ground_truth, succes_before_training = upload_samples_and_regressor(ground_truth=ground_truth_path, regressor=regressor_path, samples='datasets/configurations_improved_20_20.csv')
 
     # Oversampling methods: 20 features without SCS and FTG
     new_samples_list = oversampling_methods(invalid_config, n_samples=100, regressor=regressor)

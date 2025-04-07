@@ -18,15 +18,9 @@ def validate_configurations(opt_results, ground_truth, FTG_threshold=0.005):
     invalid_results = []
 
     # **Pre-check if required columns are present**
-    has_FTG = "FTG_HUM_1" in ground_truth.columns
     has_ub_lb = "PRSCS_UB" in ground_truth.columns and "PRSCS_LB" in ground_truth.columns
 
     # Log the findings
-    if has_FTG:
-        logger.info("FTG_HUM_1 column detected and will be assessed.")
-    else:
-        logger.warning("FTG_HUM_1 column is missing, it will not be assessed.")
-
     if has_ub_lb:
         logger.info("Upper and lower bounds (PRSCS_UB, PRSCS_LB) detected for SCS validation.")
     else:
@@ -46,12 +40,6 @@ def validate_configurations(opt_results, ground_truth, FTG_threshold=0.005):
             validity = validate_scs(opt_SCS, mc_SCS, mc_SCS_ub, mc_SCS_lb)
         else:
             validity = validate_scs(opt_SCS, mc_SCS)
-
-        # Validate FTG if available
-        if has_FTG:
-            mc_ftg = ground_truth.iloc[i]['FTG_HUM_1']
-            opt_ftg = opt_results.iloc[i]['FTG_HUM_1']
-            validity = validity and validate_ftg(mc_ftg, opt_ftg, FTG_threshold)
 
         if not validity:
             invalid_results.append(opt_results.iloc[i])
