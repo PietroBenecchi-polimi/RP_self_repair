@@ -8,7 +8,16 @@ import numpy as np
 from sklearn.metrics import log_loss
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
-from rp_logger import logger
+import logging
+
+# Configure logger
+logger = logging.getLogger("self_repair")
+logger.setLevel(logging.DEBUG)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None, SCS_threshold=0.01):
     # Upload models
@@ -31,7 +40,7 @@ def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None
     return invalid_config, regressor, ground_truth_model, success_percantage
 
 def validate_configurations_after_retraining(regressor, ground_truth):
-    data = pd.read_csv("datasets/transformed_dataset.csv")
+    data = pd.read_csv("datasets\configurations_improved_20_20.csv")
     new_data = data.drop(columns=["SCS", "FTG"])
 
     ground_truth_data = ground_truth.predict(new_data)
@@ -87,7 +96,7 @@ def main():
     ground_truth_path = "self_repair/regressor/regressor_SCS.joblib"
     regressor_path = "self_repair/regressor/regressor_SCS_LIME_100.joblib"
 
-    invalid_config, regressor, ground_truth, succes_before_training = upload_samples_and_regressor(ground_truth=ground_truth_path, regressor=regressor_path, samples='datasets/transformed_dataset.csv')
+    invalid_config, regressor, ground_truth, succes_before_training = upload_samples_and_regressor(ground_truth=ground_truth_path, regressor=regressor_path, samples='datasets/configurations_improved_20_20.csv')
 
     # Oversampling methods: 20 features without SCS and FTG
     new_samples_list = oversampling_methods(invalid_config, n_samples=100, regressor=regressor)
@@ -111,7 +120,7 @@ def main():
         msg = f"{stat['method']}: {stat['success_percentage_improvement']}"
         logger.debug(msg)
     best_method = max(stats, key=lambda x: x['success_percentage_improvement'])
-    logger.debug(f"Best resampling method is: {best_method["method"]} YUPPY!")
+    logger.debug(f"Best resampling method is: {best_method['method']} YUPPY!")
 
 if __name__ == "__main__":
     main()
