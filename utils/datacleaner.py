@@ -1,11 +1,7 @@
 import pandas as pd
 import os
 import sys
-import logging
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from utils.rp_logger import logger
 
 # Transformation rules
 transform_rules = {

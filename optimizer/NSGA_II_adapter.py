@@ -6,7 +6,7 @@ from pymoo.core.callback import Callback
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.optimize import minimize
 from tqdm import tqdm
-
+import joblib
 # Constants
 SUBSET = 1000
 POINTS = 1000
@@ -80,11 +80,11 @@ def process_dataframe(df):
 def optimize_configurations(
     df,
     regressor_SCS,
-    regressor_FTG,
     pop_size=100,
     n_gen=50
 ):
     df = process_dataframe(df)
+    regressor_FTG = joblib.load("self_repair/regressor/regressor_FTG_LIME.joblib")
     time_df = pd.DataFrame(columns=["Iteration_duration", "PSCS__TAU"])
     result_df = pd.DataFrame(columns=result_df_columns)
     val_SCS_averaged = []

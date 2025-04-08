@@ -1,9 +1,7 @@
 import pandas as pd
 import numpy as np
 from lime import lime_tabular
-import joblib
 import matplotlib.pyplot as plt
-import ast
 import os
 import numpy as np
 import sys
@@ -11,9 +9,8 @@ import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
-
-sys.path.append(os.path.abspath("utils"))
-from rp_logger import logger
+from utils.rp_logger import logger
+from alive_progress import alive_bar
 def save_lime_explanation_plot(explanation, instance_index, output_dir):
     """
     Saves the LIME explanation plot for a given instance.
@@ -49,26 +46,29 @@ def explain_prediction_with_lime(df, model, num_features):
 
     explanations = []
     explanation_dicts = []
-    for instance_index in range(0, max(0, len(df))):        
-        # Get the instance to explain
-        instance_to_explain = df.iloc[instance_index].values
-        
-        # Generate explanation
-        explanation = explainer.explain_instance(
-            data_row=instance_to_explain,
-            predict_fn=predict_fn,
-            num_features=num_features
-        )
-        
-        # Store explanation
-        explanations.append(explanation)
-        
-        # Display the feature contributions: Can be cancelled
-        explanation_dict = {}
-        for feature, weight in explanation.as_list():
-            feature_name = [name for name in feature.split() if name in feature_names][0]
-            explanation_dict[feature_name] = weight
-        explanation_dicts.append(explanation_dict)
+    logger.debug("Computing explainations")
+    with alive_bar(len(df)) as bar:
+        for instance_index in range(0, max(0, len(df))):        
+            # Get the instance to explain
+            instance_to_explain = df.iloc[instance_index].values
+            
+            # Generate explanation
+            explanation = explainer.explain_instance(
+                data_row=instance_to_explain,
+                predict_fn=predict_fn,
+                num_features=num_features
+            )
+            
+            # Store explanation
+            explanations.append(explanation)
+            
+            # Display the feature contributions: Can be cancelled
+            explanation_dict = {}
+            for feature, weight in explanation.as_list():
+                feature_name = [name for name in feature.split() if name in feature_names][0]
+                explanation_dict[feature_name] = weight
+            explanation_dicts.append(explanation_dict)
+            bar()
 
     explanation_dicts = pd.DataFrame(explanation_dicts)
     return explanation_dicts
