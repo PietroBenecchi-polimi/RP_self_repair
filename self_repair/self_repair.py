@@ -19,39 +19,28 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-def upload_samples_and_regressor(ground_truth=None, regressor=None, samples=None, SCS_threshold=0.01):
-    # Upload models
+def upload_regressors(ground_truth=None, regressor=None):
     ground_truth_model = joblib.load(ground_truth)
     regressor = joblib.load(regressor)
 
+    return regressor, ground_truth_model
+
+def verificate(regressor=None, ground_truth=None, samples=None):
     # Upload samples
     initial_configs = pd.read_csv(samples)
     sampled_df = initial_configs.sample(n=100, random_state=42)
     sampled_df = initial_configs.drop(columns=["SCS", "FTG"])
+    prediction_regressor_data = sampled_df.copy()
 
     #Predictions
-    sampled_df['SCS'] = regressor.predict(sampled_df)
-    ground_truth_data = ground_truth_model.predict(sampled_df)
+    prediction_regressor_data['SCS'] = regressor.predict(prediction_regressor_data)
+    ground_truth_data = ground_truth.predict(sampled_df)
     ground_truth_data = pd.DataFrame(ground_truth_data, columns=['SCS'])
 
-    invalid_config, success_percantage = validate_configurations(sampled_df, ground_truth_data, FTG_threshold=0.01)
+    invalid_config, success_percantage = validate_configurations(prediction_regressor_data, ground_truth_data, FTG_threshold=0.01)
     invalid_config = pd.DataFrame(invalid_config)
 
-    return invalid_config, regressor, ground_truth_model, success_percantage
-
-def validate_configurations_after_retraining(regressor, ground_truth):
-    data = pd.read_csv("datasets/last_100_rows.csv")
-    new_data = data.drop(columns=["SCS", "FTG"])
-
-    ground_truth_data = ground_truth.predict(new_data)
-    ground_truth_data = pd.DataFrame(ground_truth_data, columns=['SCS'])
-    new_data['SCS'] = regressor.predict(new_data)
-    
-    _, success_parcantage = validate_configurations(new_data, ground_truth_data, FTG_threshold=0.01)
-
-    #binary_cross_loss_function = log_loss(new_data['SCS'], ground_truth_data['SCS'])
-
-    return success_parcantage, 0.0 #binary_cross_loss_function
+    return invalid_config, success_percantage
 
 def oversampling_methods(invalid_config, n_samples=100, regressor=None):
     new_samples_list = []
@@ -98,7 +87,8 @@ def main():
     ground_truth_path = "self_repair/regressor/regressor_SCS.joblib"
     regressor_path = "self_repair/regressor/regressor_SCS_LIME_100.joblib"
 
-    invalid_config, regressor, ground_truth, succes_before_training = upload_samples_and_regressor(ground_truth=ground_truth_path, regressor=regressor_path, samples='datasets/first_100_rows.csv')
+    regressor, ground_truth = upload_regressors(ground_truth=ground_truth_path, regressor=regressor_path)
+    invalid_config, succes_before_training = verificate(regressor=regressor, ground_truth=ground_truth, samples="datasets\last_100_rows.csv")
 
     # Oversampling methods: 20 features without SCS and FTG
     new_samples_list = oversampling_methods(invalid_config, n_samples=900, regressor=regressor)
@@ -110,11 +100,10 @@ def main():
         y = ground_truth.predict(X)
         regressor.fit(X, y)
         # Validate results using new and unseen data in training
-        success_percentage, binary_loss = validate_configurations_after_retraining(regressor, ground_truth)
+        _, success_percentage = verificate(regressor=regressor, ground_truth=ground_truth, samples="datasets\last_100_rows.csv")
         stats.append({
            "method": new_samples.get("method"),
            "success_percentage_improvement": (success_percentage - succes_before_training) * 100,
-            "binary cross loss function": binary_loss,
         })
 
     print(f"Success percentage before retraining: {succes_before_training}")
