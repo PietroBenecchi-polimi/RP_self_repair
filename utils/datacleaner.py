@@ -18,6 +18,9 @@ reverse_rules = {
     col: {v: k for k, v in mapping.items()} for col, mapping in transform_rules.items()
 }
 
+def get_transformation_rules():
+    return transform_rules
+
 def categorical_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
     df_copy = df.copy()
     for column, mapping in transform_rules.items():

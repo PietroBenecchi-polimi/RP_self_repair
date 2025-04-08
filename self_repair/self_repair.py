@@ -5,19 +5,9 @@ from validation import validate_configurations
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 import numpy as np
-from sklearn.metrics import log_loss
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
-import logging
-
-# Configure logger
-logger = logging.getLogger("self_repair")
-logger.setLevel(logging.DEBUG)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+from utils.rp_logger import logger
 
 def upload_regressors(ground_truth=None, regressor=None):
     ground_truth_model = joblib.load(ground_truth)
@@ -29,7 +19,7 @@ def verificate(regressor=None, ground_truth=None, samples=None):
     # Upload samples
     initial_configs = pd.read_csv(samples)
     sampled_df = initial_configs.sample(n=100, random_state=42)
-    sampled_df = initial_configs.drop(columns=["SCS", "FTG"])
+    sampled_df = sampled_df.drop(columns=["SCS", "FTG"])
     prediction_regressor_data = sampled_df.copy()
 
     #Predictions
@@ -42,20 +32,21 @@ def verificate(regressor=None, ground_truth=None, samples=None):
 
     return invalid_config, success_percantage
 
-def oversampling_methods(invalid_config, n_samples=100, regressor=None):
+def oversampling_methods(invalid_configs, n_samples=100, regressor=None):
+    invalid_configs = invalid_configs.sample(n=n_samples) if len(invalid_configs) > n_samples else invalid_configs
     new_samples_list = []
     # Oversampling methods:
     # 1. Random oversampling
-    new_samples_random = random_oversampling(df=invalid_config, n_samples=n_samples)
+    new_samples_random = random_oversampling(df=invalid_configs)
     new_samples = {
         "method": "Random",
         "samples": new_samples_random
     }
     new_samples_list.append(new_samples)
-    invalid_config.to_csv("datasets/invalid_config.csv", index=False)
-    invalid_config = pd.read_csv("datasets/invalid_config.csv")
+    invalid_configs.to_csv("datasets/invalid_config.csv", index=False)
+    invalid_configs = pd.read_csv("datasets/invalid_config.csv")
     # 2. SMOTE based oversampling
-    new_samples_smote = smote_oversampling(df=invalid_config)
+    new_samples_smote = smote_oversampling(df=invalid_configs)
     new_samples = {
         "method": "Smote",
         "samples": new_samples_smote
@@ -63,10 +54,10 @@ def oversampling_methods(invalid_config, n_samples=100, regressor=None):
     new_samples_list.append(new_samples)
 
     # 3. LIME based oversampling
-    new_samples_lime = lime_based_resampling(df=invalid_config, regressor=regressor)
+    new_samples_lime = lime_based_resampling(df=invalid_configs, regressor=regressor)
     new_samples_lime['SCS'] = np.random.uniform(
-        low=invalid_config['SCS'].min(), 
-        high=invalid_config['SCS'].max(), 
+        low=invalid_configs['SCS'].min(), 
+        high=invalid_configs['SCS'].max(), 
         size=new_samples_lime.shape[0]
     )
     new_samples = {
@@ -88,7 +79,7 @@ def main():
     regressor_path = "self_repair/regressor/regressor_SCS_LIME_100.joblib"
 
     regressor, ground_truth = upload_regressors(ground_truth=ground_truth_path, regressor=regressor_path)
-    invalid_config, succes_before_training = verificate(regressor=regressor, ground_truth=ground_truth, samples="datasets\last_100_rows.csv")
+    invalid_config, succes_before_training = verificate(regressor=regressor, ground_truth=ground_truth, samples="datasets/last_100_rows.csv")
 
     # Oversampling methods: 20 features without SCS and FTG
     new_samples_list = oversampling_methods(invalid_config, n_samples=900, regressor=regressor)
@@ -98,9 +89,10 @@ def main():
     for new_samples in new_samples_list:
         X = new_samples.get("samples").drop(columns=["SCS"])
         y = ground_truth.predict(X)
+
         regressor.fit(X, y)
         # Validate results using new and unseen data in training
-        _, success_percentage = verificate(regressor=regressor, ground_truth=ground_truth, samples="datasets\last_100_rows.csv")
+        _, success_percentage = verificate(regressor=regressor, ground_truth=ground_truth, samples="datasets/last_100_rows.csv")
         stats.append({
            "method": new_samples.get("method"),
            "success_percentage_improvement": (success_percentage - succes_before_training) * 100,

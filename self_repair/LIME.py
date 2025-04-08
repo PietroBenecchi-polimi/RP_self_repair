@@ -29,7 +29,8 @@ def save_lime_explanation_plot(explanation, instance_index, output_dir):
         plt.savefig(os.path.join(output_dir, f"lime_explanation_{instance_index}.png"))
         plt.close()
 
-def explain_prediction_with_lime(df, model, num_features):
+def explain_prediction_with_lime(df: pd.DataFrame, model, num_features):
+    if df.empty: return df
     # Get feature names
     feature_names = df.columns.tolist()
     model.predict(df)

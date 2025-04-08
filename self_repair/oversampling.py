@@ -2,85 +2,63 @@ import pandas as pd
 import numpy as np
 from LIME import explain_prediction_with_lime 
 import smogn
+import json
+from utils.datacleaner import get_transformation_rules
+with open('datasets/hmtfactor_config.json', 'r') as file:
+    factors = dict(json.load(file))
 
 # Synthetic Minority Over-Sampling Technique for Regression with Gaussian Noise 
 #https://github.com/nickkunz/smogn?tab=readme-ov-file
-def smote_oversampling(df):
-    relevance = [
-        {"x": 0.0, "y": 1},   # Treat low SCS as rare
-        {"x": 0.5, "y": 0},   # Mid SCS as common
-        {"x": 0.9, "y": 1}    # High SCS as rare too
-    ]
-
+def smote_oversampling(df: pd.DataFrame):
     df_resampled = smogn.smoter(
-        data=df,
+        data=df.reset_index(drop=True),
         y='SCS',
-        rel_ctrl_pts_rg=relevance,
-        k=6
+        k=6,
+        rel_coef=0.35
     )
     return pd.DataFrame(df_resampled)
 
-
-def random_oversampling(df, n_samples):
+def random_oversampling(df):
     synthetic_data = {}
-        
-    for column in df.columns:
-        col_min, col_max = df[column].min(), df[column].max()
-        synthetic_data[column] = np.random.uniform(col_min, col_max, n_samples)
-    
+    transformation_rules = get_transformation_rules()
+    for factor_key in df.columns:
+        if factor_key == "SCS":
+            synthetic_data[factor_key] = np.random.uniform(0,1, len(df))
+        elif factor_key not in transformation_rules.keys():
+            if "PRGS" == factor_key:
+                synthetic_data[factor_key] = np.random.choice([0,1,2,3,4,5])
+                continue
+            elif factor_key in ["HUM_1_POS_X", "HUM_2_POS_X"]:
+                col_min, col_max = factors["HUM_1_POS"]["max_x"], factors["HUM_1_POS"]["min_x"]
+            elif factor_key in ["HUM_1_POS_Y", "HUM_2_POS_Y"]:
+                col_min, col_max = factors["HUM_1_POS"]["max_y"], factors["HUM_1_POS"]["min_y"]
+            elif "max" in factors[factor_key]:
+                col_min, col_max = factors[factor_key]["max"], factors[factor_key]["min"]
+            synthetic_data[factor_key] = np.random.uniform(col_min, col_max, len(df))
+        else:
+            values = list(transformation_rules[factor_key].values())
+            synthetic_data[factor_key] = np.random.choice(values, len(df))
+
     return pd.DataFrame(synthetic_data)
 
 def lime_based_resampling(df, regressor):
-    """
-    Resampling based on LIME explanations.
-    """    
     df = df.drop(columns=["SCS"])
-    # Extract feature importances from LIME explanations
     new_samples = []
+    epsilon = 1e-5  # to avoid division by zero
 
     explanations = explain_prediction_with_lime(df, regressor, num_features=20)
 
     for index in range(df.shape[0]):
         new_sample = df.iloc[index].copy()
-        # Using index since we have a dataseries, not a dataframe
         for feature in new_sample.keys():
-            # Mean in original sample, while variance is the feature importance from LIME
             mean = new_sample[feature]
-            variance = explanations.iloc[index][feature]
+            importance = explanations.iloc[index].get(feature, 0.0)
+            variance = abs(1.0 / (importance + epsilon))
+            variance = min(variance, 1.0)
 
-            # minimum variance
-            variance = max(variance, 0.01)
-            
-            # new distribution
             new_value = np.random.normal(mean, np.sqrt(variance))
-        
             new_sample[feature] = new_value
         
         new_samples.append(new_sample)
     
-    resampled_df = pd.DataFrame(new_samples)
-
-    return resampled_df
-
-def main():
-    csv_path = "Matching_and_verifier\invalid_configs\invalid_config_0.2_0.005.csv"
-    model_path = "regressor_SCS.joblib"
-
-    # get explanations from LIME
-    explanations = explain_prediction_with_lime(csv_path, model_path, num_features=20)
-    explanations_df = pd.DataFrame(explanations)
-    X = pd.read_csv(csv_path)
-
-    # new samples based on LIME explanations
-    resampled_X = lime_based_resampling(X, explanations_df, X.shape[0], scale_factor=0.1)
-    resampled_X_smogn = smote_oversampling(X)
-    random_oversampling_X = random_oversampling(X, X.shape[0])
-
-    output_path = "lime_resampled_data.csv"
-
-    resampled_X.to_csv(output_path, index=False)
-    resampled_X_smogn.to_csv("smote_resampled_data.csv", index=False)
-    random_oversampling_X.to_csv("random_oversampling.csv", index=False)
-    
-if __name__ == "__main__":
-    main()
+    return pd.DataFrame(new_samples)

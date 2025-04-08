@@ -7,9 +7,6 @@ from pymoo.core.problem import ElementwiseProblem
 from pymoo.optimize import minimize
 from tqdm import tqdm
 import joblib
-# Constants
-SUBSET = 1000
-POINTS = 1000
 
 all_features = [
     "PRGS", "ORCH_1_Dstop", "ORCH_1_Drestart", "ORCH_1_Fstop", "ORCH_1_Frestart",

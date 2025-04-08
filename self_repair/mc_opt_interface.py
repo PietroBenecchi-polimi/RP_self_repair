@@ -11,7 +11,6 @@ def mc_results_from_configs(new_configs:pd.DataFrame, cache_file_name:str) -> pd
     return result
 def mc_results_from_configs(new_configs:pd.DataFrame, scs_ground_truth_regressor) -> pd.DataFrame:
     scs_y = scs_ground_truth_regressor.predict(new_configs)
-    scs_y = [True if y > 0.5 else False for y in scs_y]
     new_configs["SCS"] = scs_y
     return new_configs
 
@@ -26,6 +25,5 @@ def opt_optimization(new_configs:pd.DataFrame, scs_regressor, cache_file_name:st
     return result
 
 def opt_optimization(new_configs:pd.DataFrame, scs_regressor) -> pd.DataFrame:
-    predictions = scs_regressor.predict(new_configs)
-    new_configs["SCS"] = predictions
+    new_configs["SCS"] = scs_regressor.predict(new_configs)
     return new_configs

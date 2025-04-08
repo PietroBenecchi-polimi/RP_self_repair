@@ -1,11 +1,14 @@
 import pandas as pd
 from utils.rp_logger import logger
-
+import numpy as np
 def validate_scs(opt_SCS, mc_SCS, mc_ub=1, mc_lb=0):
-    if opt_SCS > 0.9:
-        return bool(mc_SCS) and mc_SCS <= mc_ub
-    else:
-        return not bool(mc_SCS) and mc_SCS >= mc_lb
+    epsilon = np.abs(opt_SCS - mc_SCS)
+    return epsilon < 0.1
+    # mc_SCS_bool = bool(mc_SCS > 0.5)
+    # if opt_SCS > 0.9:
+    #     return mc_SCS_bool and mc_SCS <= mc_ub
+    # else:
+    #     return not mc_SCS_bool and mc_SCS >= mc_lb
 
 def validate_configurations(opt_results, ground_truth, FTG_threshold=0.005):
     validity_array = []
