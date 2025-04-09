@@ -4,10 +4,11 @@ from oversampling import lime_based_resampling, random_oversampling, smote_overs
 from validation import validate_configurations
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
-import numpy as np
 from typing import Dict
 import multiprocessing
 import time
+import sys
+from sklearn.model_selection import train_test_split
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
@@ -31,12 +32,14 @@ def oversample_method(method_name: str, invalid_configs: pd.DataFrame, regressor
     }
 
 def oversampling_methods_parallel(invalid_configs: pd.DataFrame, n_samples=100, regressor=None) -> Dict:
+    # Samples from invalid configurations
+    samples = invalid_configs.sample(n=n_samples) if len(invalid_configs) > n_samples else invalid_configs
     # Create list of oversampling methods
-    methods = ["Random", "Smote", "LIME_gaussian"]
+    methods = ["Smote", "Random", "LIME_gaussian"]
     
     # Use multiprocessing to parallelize oversampling methods
     with multiprocessing.Pool(processes=len(methods)) as pool:
-        results = pool.starmap(oversample_method, [(method, invalid_configs.sample(n=n_samples) if len(invalid_configs) > n_samples else invalid_configs, regressor) for method in methods])
+        results = pool.starmap(oversample_method, [(method, samples, regressor) for method in methods])
 
     return results
 
@@ -55,20 +58,30 @@ def process_oversampling_method(method: Dict, opt_samples_results: pd.DataFrame,
 
     # Run NSGA-II
     new_opt_configs_results = opt_optimization(test_config_set.drop(columns=["SCS"]), scs_regressor)
-
     # Validation
     _, success_percentage = validate_configurations(new_opt_configs_results, mc_test_config_set)
     logger.debug(f"{method['method']} oversampling concluded: success percentage: {success_percentage}")
     return {"method": method["method"], "success_percentage": success_percentage}
 
 if __name__ == "__main__":
-    opt_samples_results = categorical_to_numeric(pd.read_csv("datasets/initial_configurations_to_improve.csv")).drop(columns=["PRSCS_LB", "PRSCS_UB", "FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
+    if(len(sys.argv) > 2):
+        n_data_to_verify = int(sys.argv[1])
+        n_samples = int(sys.argv[2])
+    elif(len(sys.argv) > 1):
+        n_data_to_verify = int(sys.argv[1])
+        n_samples = 25
+    else:
+        n_data_to_verify = 200
+        n_samples = 25
+    initial_dataset = categorical_to_numeric(pd.read_csv("datasets/initial_configurations_to_improve.csv")).drop(columns=["PRSCS_LB", "PRSCS_UB", "FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
+    opt_samples_results, opt_testing_results = train_test_split(initial_dataset, test_size=0.2)
+    opt_samples_results = opt_samples_results.sample(n=n_data_to_verify) if len(opt_samples_results) > n_samples else opt_samples_results
     scs_regressor = joblib.load("self_repair/regressor/regressor_SCS_LIME_100.joblib")
     opt_results = opt_optimization(opt_samples_results.drop(columns=["SCS"]), scs_regressor)
     opt_configs = opt_results.drop(columns=["SCS"])
     scs_ground_truth_regressor = joblib.load("self_repair/regressor/regressor_SCS.joblib")
     ground_truth_results = mc_results_from_configs(opt_configs, scs_ground_truth_regressor)
-
+    ground_truth_test_results = mc_results_from_configs(opt_testing_results.drop(columns=["SCS"]), scs_ground_truth_regressor)
     # Calculate accuracy
     stats = []
     invalid_configs, success_percentage = validate_configurations(opt_results, ground_truth_results)
@@ -76,10 +89,10 @@ if __name__ == "__main__":
     stats.append({"method": "no oversampling", "success_percentage": success_percentage})
 
     # Oversampling methods
-    methods_samples = oversampling_methods_parallel(invalid_configs, 100, scs_regressor)
+    methods_samples = oversampling_methods_parallel(invalid_configs, n_samples, scs_regressor)
 
     # Create args list for parallel processing of oversampling methods
-    args = [(method, opt_samples_results, scs_regressor, scs_ground_truth_regressor, opt_samples_results, ground_truth_results) for method in methods_samples]
+    args = [(method, opt_samples_results, scs_regressor, scs_ground_truth_regressor, opt_testing_results, ground_truth_test_results) for method in methods_samples]
 
     logger.debug("Starting the oversampling and validation process")
     start_time = time.time()
@@ -92,7 +105,7 @@ if __name__ == "__main__":
     logger.debug("Oversampling and validation process completed")
     logger.debug(f"Parallel processing took {end_time - start_time:.2f} seconds")
 
-    # Add results to stats
+    # Add results to stats 
     stats.extend(results)
 
     # Log the oversampling summary

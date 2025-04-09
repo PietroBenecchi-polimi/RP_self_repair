@@ -82,7 +82,7 @@ def main():
     invalid_config, succes_before_training = verificate(regressor=regressor, ground_truth=ground_truth, samples="datasets/last_100_rows.csv")
 
     # Oversampling methods: 20 features without SCS and FTG
-    new_samples_list = oversampling_methods(invalid_config, n_samples=900, regressor=regressor)
+    new_samples_list = oversampling_methods(invalid_config, n_samples=50, regressor=regressor)
 
     stats = []
     #Retrain regressor with oversampled data
