@@ -9,6 +9,7 @@ import multiprocessing
 import time
 import sys
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
@@ -43,25 +44,39 @@ def oversampling_methods_parallel(invalid_configs: pd.DataFrame, n_samples=100, 
 
     return results
 
-def process_oversampling_method(method: Dict, opt_samples_results: pd.DataFrame, scs_regressor, scs_ground_truth_regressor, test_config_set: pd.DataFrame, mc_test_config_set: pd.DataFrame) -> Dict:
+def process_oversampling_method(method: Dict, opt_samples_results: pd.DataFrame, regressor, ground_truth_regressor, test_dataset: pd.DataFrame) -> Dict:
     logger.debug(f"Oversampling via {method['method']}")
     new_samples = method["samples"]
 
     # Generate MC results
-    new_samples_results = mc_results_from_configs(new_samples, scs_ground_truth_regressor)
+    new_samples_results = mc_results_from_configs(new_samples, ground_truth_regressor)
     oversampling = pd.concat([new_samples_results, opt_samples_results], ignore_index=True)
 
     # Retrain the regressor
     X = oversampling.drop(columns=["SCS"])
     y = oversampling["SCS"]
-    scs_regressor.fit(X, y)
+    regressor.fit(X, y)
 
     # Run NSGA-II
-    new_opt_configs_results = opt_optimization(test_config_set.drop(columns=["SCS"]), scs_regressor)
+    new_opt_configs_results = opt_optimization(test_dataset.drop(columns=["SCS"]),regressor, method['method'])
+    # Ground truth
+    new_groundtruth = mc_results_from_configs(new_opt_configs_results.drop(columns=["SCS"]), ground_truth_regressor)
     # Validation
-    _, success_percentage = validate_configurations(new_opt_configs_results, mc_test_config_set)
+    _, success_percentage = validate_configurations(new_opt_configs_results, new_groundtruth)
     logger.debug(f"{method['method']} oversampling concluded: success percentage: {success_percentage}")
     return {"method": method["method"], "success_percentage": success_percentage}
+
+
+def train_new_regressor(training_set: pd.DataFrame):
+
+    X_train = training_set.drop(columns=["SCS"])
+    y_train = training_set["SCS"]
+
+    regressor = RandomForestRegressor(n_estimators=100, random_state=42)
+    regressor.fit(X_train, y_train)
+
+    logger.debug("New regressor trained successfully")
+    return regressor
 
 if __name__ == "__main__":
     if(len(sys.argv) > 2):
@@ -73,26 +88,34 @@ if __name__ == "__main__":
     else:
         n_data_to_verify = 200
         n_samples = 25
-    initial_dataset = categorical_to_numeric(pd.read_csv("datasets/initial_configurations_to_improve.csv")).drop(columns=["PRSCS_LB", "PRSCS_UB", "FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
-    opt_samples_results, opt_testing_results = train_test_split(initial_dataset, test_size=0.2)
-    opt_samples_results = opt_samples_results.sample(n=n_data_to_verify) if len(opt_samples_results) > n_samples else opt_samples_results
-    scs_regressor = joblib.load("self_repair/regressor/regressor_SCS_LIME_100.joblib")
-    opt_results = opt_optimization(opt_samples_results.drop(columns=["SCS"]), scs_regressor)
+
+    # Sets up ground truth
+    ground_truth_regressor = joblib.load("self_repair/regressor/regressor_SCS.joblib")
+    # Loads dataset and creates regressor on a fixed number of samples
+    dataset = categorical_to_numeric(pd.read_csv("datasets/dataset1000.csv")).drop(columns=["PRSCS_LB", "PRSCS_UB", "FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
+    dataset = dataset.sample(100).reset_index(drop=True)
+    logger.debug(f"Training new regressor with {len(dataset)} points")
+    regressor = train_new_regressor(dataset)
+    # Creates datasets for the before and after oversampling verification
+    verification_dataset = categorical_to_numeric(pd.read_csv("datasets/initial_configurations_to_improve.csv")).drop(columns=["PRSCS_LB", "PRSCS_UB", "FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
+    first_verification, second_verification = train_test_split(verification_dataset, test_size=0.5)
+    first_verification = pd.DataFrame(first_verification).sample(n=n_data_to_verify) if len(first_verification) > n_samples else pd.DataFrame(first_verification)
+    second_verification = pd.DataFrame(second_verification).sample(n=n_data_to_verify) if len(second_verification) > n_samples else pd.DataFrame(second_verification)
+    # Before resampling verification
+    opt_results = opt_optimization(first_verification.drop(columns=["SCS"]),regressor, "regressor_100")
     opt_configs = opt_results.drop(columns=["SCS"])
-    scs_ground_truth_regressor = joblib.load("self_repair/regressor/regressor_SCS.joblib")
-    ground_truth_results = mc_results_from_configs(opt_configs, scs_ground_truth_regressor)
-    ground_truth_test_results = mc_results_from_configs(opt_testing_results.drop(columns=["SCS"]), scs_ground_truth_regressor)
+    ground_truth_first_verificatation = mc_results_from_configs(opt_configs, ground_truth_regressor)
     # Calculate accuracy
     stats = []
-    invalid_configs, success_percentage = validate_configurations(opt_results, ground_truth_results)
+    invalid_configs, success_percentage = validate_configurations(opt_results, ground_truth_first_verificatation)
     logger.debug(f"Success percentage before oversampling: {success_percentage}")
     stats.append({"method": "no oversampling", "success_percentage": success_percentage})
 
     # Oversampling methods
-    methods_samples = oversampling_methods_parallel(invalid_configs, n_samples, scs_regressor)
+    methods_samples = oversampling_methods_parallel(invalid_configs, n_samples, regressor)
 
     # Create args list for parallel processing of oversampling methods
-    args = [(method, opt_samples_results, scs_regressor, scs_ground_truth_regressor, opt_testing_results, ground_truth_test_results) for method in methods_samples]
+    args = [(method, dataset, regressor, ground_truth_regressor, first_verification) for method in methods_samples]
 
     logger.debug("Starting the oversampling and validation process")
     start_time = time.time()

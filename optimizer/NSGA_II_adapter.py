@@ -77,11 +77,11 @@ def process_dataframe(df):
 def optimize_configurations(
     df,
     regressor_SCS,
-    pop_size=100,
-    n_gen=50
+    pop_size=20,
+    n_gen=20
 ):
     df = process_dataframe(df)
-    regressor_FTG = joblib.load("self_repair/regressor/regressor_FTG_LIME.joblib")
+    regressor_FTG = joblib.load("self_repair/regressor/regressor_FTG.joblib")
     time_df = pd.DataFrame(columns=["Iteration_duration", "PSCS__TAU"])
     result_df = pd.DataFrame(columns=result_df_columns)
     val_SCS_averaged = []
