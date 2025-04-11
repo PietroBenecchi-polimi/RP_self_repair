@@ -1,6 +1,6 @@
 import pandas as pd
-from oversampling import lime_based_resampling, random_oversampling, smote_oversampling
-from validation import validate_configurations
+from self_repair.oversampling import lime_based_resampling, random_oversampling, smote_oversampling
+from self_repair.validation import validate_configurations
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 from typing import Dict
@@ -13,7 +13,7 @@ from sklearn.ensemble import RandomForestRegressor
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
 from utils.datacleaner import categorical_to_numeric
-from mc_opt_interface import *
+from self_repair.mc_opt_interface import *
 
 def oversample_method(method_name: str, invalid_configs: pd.DataFrame, regressor=None) -> Dict:
     if method_name == "Random":
