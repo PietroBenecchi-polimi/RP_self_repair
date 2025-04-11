@@ -70,7 +70,6 @@ def process_oversampling_method(method: Dict, opt_samples_results: pd.DataFrame,
 
     return {"method": method["method"], "success_percentage": success_percentage}
 
-
 def train_new_regressor(training_set: pd.DataFrame, n_points):
     X_train = training_set.drop(columns=["SCS"])
     y_train = training_set["SCS"]
@@ -97,15 +96,15 @@ if __name__ == "__main__":
     else:
         logger.info(f"No argument passed. Default configuration will be used.")
     logger.info(f"Configuration: datset_size:{n_data_to_verify}, oversampling size:{n_samples}, {'invalid configuration for validation' if final_validation_invalid_configs else 'new dataset for validation'}")
-    n_points = 10
+    n_points = 100
     dataset = categorical_to_numeric(pd.read_csv("datasets/dataset1000.csv")).drop(columns=["FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
     dataset["SCS"] = (dataset["PRSCS_LB"] + dataset["PRSCS_UB"]) /2
     dataset = dataset.drop(columns=["PRSCS_LB", "PRSCS_UB"])
-    dataset = dataset.sample(n_points, random_state=42).reset_index(drop=True)
     # Sets up ground truth
     ground_truth_regressor = train_new_regressor(dataset, 1000)
     # Loads dataset and creates regressor on a fixed number of samples
     logger.debug(f"Training new regressor with {n_points} points")
+    dataset = dataset.sample(n_points, random_state=128).reset_index(drop=True)
     regressor = train_new_regressor(dataset, n_points)
     # Creates datasets for the before and after oversampling verification
     verification_dataset = categorical_to_numeric(pd.read_csv("datasets/initial_configurations_to_improve.csv")).drop(columns=["FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"])
@@ -123,7 +122,7 @@ if __name__ == "__main__":
     invalid_configs, success_percentage = validate_configurations(opt_results, ground_truth_first_verificatation)
     logger.debug(f"Success percentage before oversampling: {success_percentage}")
     stats.append({"method": "no oversampling", "success_percentage": success_percentage})
-    second_test = invalid_configs if final_validation_invalid_configs else second_verification
+    second_test = invalid_configs if final_validation_invalid_configs else second_verification # Add first_case_verification
     # Oversampling methods
     methods_samples = oversampling_methods_parallel(invalid_configs, n_samples, regressor)
     # Adds previous regressor without sampling
