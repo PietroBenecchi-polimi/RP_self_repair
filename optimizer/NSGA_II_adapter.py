@@ -45,12 +45,27 @@ class MOO(ElementwiseProblem):
         super().__init__(n_var=len(feature_names),
                          n_obj=2,
                          n_constr=0,
-                         xl=np.array([5.0, 2.0, 0.5, 0.1, 30.0, 30.0, 30.0]),
+                         xl=np.array([5.0, 2.0, 0.5, 0.1, 30.0, 30.0, 30.0]),  # Lower bounds for decision variables
                          xu=np.array([7.5, 4.5, 0.8, 0.4, 100.0, 100.0, 100.0]),
-                         **kwargs)
+                         **kwargs)  # Upper bounds for decision variables
+
         self.row_unmodifiable = row_unmodifiable
         self.regressor_SCS = regressor_SCS
         self.regressor_FTG = regressor_FTG
+
+    def _evaluate(self, X, out, *args, **kwargs):
+        X = np.array(X).reshape(1, 7)
+        model_input = self.reorganize_input_indices(X, self.row_unmodifiable)
+        success_probability = self.regressor_SCS.predict(model_input)
+        muscle_fatigue = self.regressor_FTG.predict(model_input)
+        success_probability = -success_probability
+        out["F"] = np.array([success_probability, muscle_fatigue])
+
+    def reorganize_input_indices(self, row_modifiable, row_unmodifiable):
+        new_df = pd.DataFrame(columns=all_features)
+        new_df[feature_names] = row_modifiable
+        new_df[constant_parameters] = row_unmodifiable
+        return new_df
 
 
 
@@ -81,15 +96,22 @@ def optimize_configurations(
     n_gen=20
 ):
     df = process_dataframe(df)
+
+    # Check for missing values
+    if df.isnull().values.any():
+        raise ValueError("Input DataFrame contains NaN values. Please clean the data.")
+
     regressor_FTG = joblib.load("self_repair/regressor/regressor_FTG.joblib")
-    time_df = pd.DataFrame(columns=["Iteration_duration", "PSCS__TAU"])
-    result_df = pd.DataFrame(columns=result_df_columns)
+    time_records = []
+    results = []
+
     val_SCS_averaged = []
     val_FTG_averaged = []
     unfeasible_configurations = 0
 
     for idx, (_, row) in tqdm(enumerate(df.iterrows()), total=df.shape[0]):
         start_time = time.time()
+
         problem = MOO(
             df[constant_parameters].to_numpy()[idx].reshape((1, len(constant_parameters))),
             regressor_SCS,
@@ -107,19 +129,24 @@ def optimize_configurations(
         val_SCS_averaged.append(valSCS)
         val_FTG_averaged.append(valFTG)
 
-        result_local = pd.DataFrame(columns=result_df.columns)
-        result_local[feature_names] = res.X[-1].reshape((1, len(feature_names)))
-        result_local[constant_parameters] = df[constant_parameters].to_numpy()[idx]
-        result_local["SCS"] = -res.F[-1, 0]
-        result_local["FTG"] = res.F[-1, 1]
-        result_df = pd.concat([result_df, result_local], ignore_index=True)
+        # Assemble results cleanly using a dictionary
+        result_row = {
+            **{name: val for name, val in zip(feature_names, res.X[-1])},
+            **{name: df.loc[idx, name] for name in constant_parameters},
+            "SCS": -res.F[-1, 0],
+            "FTG": res.F[-1, 1]
+        }
+        results.append(result_row)
 
         iteration_duration = end_time - start_time
-        if iteration_duration > df["PSCS__TAU"][idx]:
+        if iteration_duration > df.loc[idx, "PSCS__TAU"]:
             unfeasible_configurations += 1
 
-        time_df = pd.concat([time_df, pd.DataFrame([{
+        time_records.append({
             "Iteration_duration": iteration_duration,
-            "PSCS__TAU": df["PSCS__TAU"][idx]
-        }])])
+            "PSCS__TAU": df.loc[idx, "PSCS__TAU"]
+        })
+
+    result_df = pd.DataFrame(results, columns=result_df_columns)
+
     return result_df
