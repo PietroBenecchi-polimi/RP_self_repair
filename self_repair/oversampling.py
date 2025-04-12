@@ -14,7 +14,6 @@ def smote_oversampling(df: pd.DataFrame):
         data=df.reset_index(drop=True),
         y='SCS',
         k=6,
-        rel_coef=0.35
     )
     return pd.DataFrame(df_resampled)
 
