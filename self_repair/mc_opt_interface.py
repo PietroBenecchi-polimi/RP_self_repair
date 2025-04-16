@@ -11,8 +11,11 @@ def mc_results_from_configs(new_configs:pd.DataFrame, cache_file_name:str) -> pd
         result = pd.DataFrame(columns=pd.read_csv("datasets/initial_configurations_to_improve.csv").columns)
     return result
 def mc_results_from_configs(new_configs:pd.DataFrame, scs_ground_truth_regressor) -> pd.DataFrame:
-    scs_y = scs_ground_truth_regressor.predict(new_configs)
-    new_configs["SCS"] = scs_y
+    try:
+        scs_y = scs_ground_truth_regressor.predict(new_configs)
+        new_configs["SCS"] = scs_y
+    except Exception:
+        new_configs = new_configs
     return new_configs
 
 def opt_optimization(new_configs: pd.DataFrame, scs_regressor, cache_file_name: str, skip_caching=False) -> pd.DataFrame:
@@ -38,6 +41,6 @@ def opt_optimization(new_configs: pd.DataFrame, scs_regressor, cache_file_name: 
     return result.drop(columns=["FTG"])
 
 
-# def opt_optimization(new_configs:pd.DataFrame, scs_regressor, cache_file_name: str = "") -> pd.DataFrame:
+# def opt_optimization(new_configs:pd.DataFrame, scs_regressor, cache_file_name: str = "", skip_cache = False) -> pd.DataFrame:
 #     new_configs["SCS"] = scs_regressor.predict(new_configs.drop(columns="SCS"))
 #     return new_configs

@@ -92,8 +92,8 @@ def process_dataframe(df):
 def optimize_configurations(
     df,
     regressor_SCS,
-    pop_size=20,
-    n_gen=20
+    pop_size=35,
+    n_gen=10
 ):
     df = process_dataframe(df)
 
@@ -141,7 +141,6 @@ def optimize_configurations(
         iteration_duration = end_time - start_time
         if iteration_duration > df.loc[idx, "PSCS__TAU"]:
             unfeasible_configurations += 1
-
         time_records.append({
             "Iteration_duration": iteration_duration,
             "PSCS__TAU": df.loc[idx, "PSCS__TAU"]
