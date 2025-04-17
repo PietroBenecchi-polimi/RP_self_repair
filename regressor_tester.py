@@ -21,7 +21,7 @@ def load_existing_results(save_path: str) -> List[Dict]:
 
 def run_experiments(regressor_points: List[int], resampling_points: List[int], invalid_configs_validation: bool) -> List[Dict]:
     """Run the oversampling pipeline for different parameter combinations."""
-    save_path = f"tester/data/oversampling_results_{'invalid_configs' if invalid_configs_validation else "first_configs"}.json"
+    save_path = f"tester/data/oversampling_results_{'invalid_configs' if invalid_configs_validation else 'first_configs'}.json"
     stats_per_points = load_existing_results(save_path)
     existing_combinations = {(d['regressor_points'], d['resampling_points']) 
                             for d in stats_per_points if 'regressor_points' in d}
@@ -71,38 +71,6 @@ def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
     
     return pd.DataFrame(data)
 
-def visualize_comparison_violin(df_invalid: pd.DataFrame, df_standard: pd.DataFrame) -> None:
-    """Create side-by-side violin plots comparing both validation methods."""
-    plt.figure(figsize=(16, 8))
-    
-    # Create subplots
-    plt.subplot(1, 2, 1)
-    ax1 = sns.violinplot(data=df_invalid, x='Method', y='Epsilon', 
-                        inner='quartile', cut=0, palette='muted', saturation=0.75)
-    add_mean_lines(ax1, df_invalid)
-    plt.title("Validation with Invalid Configs", fontsize=14, pad=15)
-    plt.xlabel("Oversampling Method", fontsize=12)
-    plt.ylabel("Epsilon Value", fontsize=12)
-    plt.xticks(rotation=45, ha='right')
-    plt.grid(True, axis='y', linestyle=':', alpha=0.7)
-    
-    plt.subplot(1, 2, 2)
-    ax2 = sns.violinplot(data=df_standard, x='Method', y='Epsilon', 
-                        inner='quartile', cut=0, palette='muted', saturation=0.75)
-    add_mean_lines(ax2, df_standard)
-    plt.title("Standard Validation", fontsize=14, pad=15)
-    plt.xlabel("Oversampling Method", fontsize=12)
-    plt.ylabel("Epsilon Value", fontsize=12)
-    plt.xticks(rotation=45, ha='right')
-    plt.grid(True, axis='y', linestyle=':', alpha=0.7)
-    
-    plt.tight_layout()
-    plt.savefig("oversampling_comparison_violin_plots.png", 
-               dpi=300, 
-               bbox_inches='tight',
-               transparent=False)
-    plt.show()
-
 def add_mean_lines(ax, df):
     """Helper function to add mean lines and annotations to a plot."""
     means = df.groupby('Method')['Epsilon'].mean()
@@ -127,36 +95,101 @@ def add_mean_lines(ax, df):
     if handles:
         ax.legend(handles, labels, loc='upper right', framealpha=1)
 
+def visualize_comparison_violin(df_invalid: pd.DataFrame, df_standard: pd.DataFrame, r_points: int, s_points: int) -> None:
+    """Create a split violin plot showing both validation types for a specific configuration."""
+    df_invalid = df_invalid.copy()
+    df_standard = df_standard.copy()
+
+    combined_df = pd.concat([df_invalid, df_standard])
+
+    plt.figure(figsize=(12, 6))
+    ax = sns.violinplot(data=combined_df, x='Method', y='Epsilon', hue='Validation Type',
+                        split=True, inner='quartile', palette='muted', cut=0, saturation=0.75)
+
+    # Add mean lines per method and validation type
+    for method in combined_df['Method'].unique():
+        for val_type in ['Invalid Configs', 'Standard']:
+            mean_val = combined_df[(combined_df['Method'] == method) & 
+                                   (combined_df['Validation Type'] == val_type)]['Epsilon'].mean()
+            xpos = list(combined_df['Method'].unique()).index(method)
+            offset = -0.2 if val_type == 'Invalid Configs' else 0.2
+            ax.plot([xpos + offset - 0.05, xpos + offset + 0.05],
+                    [mean_val, mean_val],
+                    color='red', linewidth=2)
+
+    plt.title(f"Validation Comparison — Regressor: {r_points}, Resampling: {s_points}", fontsize=14)
+    plt.xlabel("Oversampling Method", fontsize=12)
+    plt.ylabel("Epsilon", fontsize=12)
+    plt.xticks(rotation=45)
+    plt.grid(True, axis='y', linestyle=':', alpha=0.7)
+    plt.legend(title='Validation Type')
+    plt.tight_layout()
+    plt.savefig(f"tester/figs/combined_violin_r{r_points}_s{s_points}.png", dpi=300)
+    plt.show()
+
+def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame) -> None:
+    """Plot epsilon vs. resampling points separately for each validation type."""
+    validation_types = df_combined['Validation Type'].unique()
+
+    for v_type in validation_types:
+        df_subset = df_combined[df_combined['Validation Type'] == v_type]
+        regressor_points = sorted(df_subset['Regressor Points'].unique())
+
+        n_rows = int(np.ceil(len(regressor_points) / 2))
+        fig, axes = plt.subplots(n_rows, 2, figsize=(14, 5 * n_rows), sharey=True)
+        axes = axes.flatten()
+
+        for idx, r_point in enumerate(regressor_points):
+            ax = axes[idx]
+            subset = df_subset[df_subset['Regressor Points'] == r_point]
+
+            sns.lineplot(
+                data=subset,
+                x='Resampling Points',
+                y='Epsilon',
+                hue='Method',
+                markers=True,
+                dashes=False,
+                ax=ax
+            )
+
+            ax.set_title(f"{v_type} - Regressor Points: {r_point}", fontsize=13)
+            ax.set_xlabel("Resampling Points")
+            ax.set_ylabel("Epsilon")
+            ax.grid(True, linestyle=':', alpha=0.7)
+            ax.legend(title='Method', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        for j in range(idx + 1, len(axes)):
+            fig.delaxes(axes[j])
+
+        plt.suptitle(f"Epsilon vs. Resampling Points ({v_type})", fontsize=16)
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        filename = f"tester/figs/epsilon_trend_{v_type.replace(' ', '_').lower()}.png"
+        plt.savefig(filename, dpi=300)
+        plt.show()
+
 def main():
-    # Configuration parameters
     regressor_points = [5, 10, 30, 50]
     resampling_points = [30, 50, 100]
-    
-    # Run experiments for both validation types
+
     standard_stats = run_experiments(regressor_points, resampling_points, False)
     invalid_stats = run_experiments(regressor_points, resampling_points, True)
-    
-    # Process results
+
     df_standard = process_results(standard_stats)
     df_invalid = process_results(invalid_stats)
     
-    # Add validation type identifier
     df_invalid['Validation Type'] = 'Invalid Configs'
     df_standard['Validation Type'] = 'Standard'
-    
-    # Visualize comparison
-    visualize_comparison_violin(df_invalid, df_standard)
-    
-    # Optional: Also create a combined plot
-    combined_df = pd.concat([df_invalid, df_standard])
-    plt.figure(figsize=(14, 8))
-    sns.violinplot(data=combined_df, x='Method', y='Epsilon', hue='Validation Type',
-                  split=True, inner='quartile', palette='muted')
-    plt.title("Epsilon Distribution by Method and Validation Type", fontsize=14)
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.savefig("tester/figs/combined_validation_comparison.png", dpi=300)
-    plt.show()
+
+    for r in regressor_points:
+        for s in resampling_points:
+            df_s = df_standard[(df_standard['Regressor Points'] == r) & (df_standard['Resampling Points'] == s)]
+            df_i = df_invalid[(df_invalid['Regressor Points'] == r) & (df_invalid['Resampling Points'] == s)]
+            if not df_s.empty and not df_i.empty:
+                visualize_comparison_violin(df_i, df_s, r_points=r, s_points=s)
+    # Combine for general plotting
+    df_combined = pd.concat([df_standard, df_invalid])
+    plot_epsilon_over_resampling_points(df_combined)
 
 if __name__ == "__main__":
     from multiprocessing import freeze_support
