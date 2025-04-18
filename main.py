@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.base import clone
 import numpy as np
+import utils as ut
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
@@ -61,7 +62,7 @@ def oversampling_methods_parallel(invalid_configs: pd.DataFrame, previous_config
     results = [result for result in results if result["error"] == False]
     return results
 
-def process_oversampling_method(method: Dict, opt_samples_results: pd.DataFrame, regressor, ground_truth_regressor, test_dataset: pd.DataFrame, skip_cache = True) -> Dict:
+def oversample_and_validation(method: Dict, opt_samples_results: pd.DataFrame, regressor, ground_truth_regressor, test_dataset: pd.DataFrame, skip_cache = True) -> Dict:
     
     logger.debug(f"Oversampling via {method['method']}")
     new_samples = method["samples"]
@@ -99,49 +100,59 @@ def train_new_regressor(training_set: pd.DataFrame, points_regressor):
     return regressor
 
 def run_oversampling_pipeline(n_data_to_verify, n_samples, final_validation_invalid_configs, points_regressor, skip_cache = True):
-    logger.info(f"Configuration: datset_size:{n_data_to_verify}, oversampling size:{n_samples}, "f"{'invalid configuration for validation' if final_validation_invalid_configs else 'new dataset for validation'}")
-    dataset = categorical_to_numeric(pd.read_csv("datasets/dataset1000.csv")).drop(
-        columns=["FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"]
-    )
-    dataset["SCS"] = (dataset["PRSCS_LB"] + dataset["PRSCS_UB"]) / 2
-    dataset = dataset.drop(columns=["PRSCS_LB", "PRSCS_UB"])
+    logger.info(f"Configuration: dataset_size:{n_data_to_verify}, oversampling size:{n_samples}, "f"{'invalid configuration for validation' if final_validation_invalid_configs else 'new dataset for validation'}")
+    
+    #Training dataset
+    data_path = "datasets/dataset1000.csv"
+    dataset = ut.prepare_dataset(data_path)
 
+    # Model checker, ground truth regressor
     ground_truth_regressor = train_new_regressor(dataset, 1000)
     logger.debug(f"Training new regressor with {points_regressor} points")
     #dataset = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
+    # stupid regressor trained with at least 1/10 of data of gorund truth
     regressor = train_new_regressor(dataset, points_regressor)
 
-    verification_dataset = categorical_to_numeric(pd.read_csv("datasets/initial_configurations_to_improve.csv")).drop(
-        columns=["FTG_HUM_1", "FTG_HUM_1_LB", "FTG_HUM_1_UB", "FTG_HUM_2", "FTG_HUM_2_LB", "FTG_HUM_2_UB"]
-    )
-    verification_dataset["SCS"] = (verification_dataset["PRSCS_LB"] + verification_dataset["PRSCS_UB"]) / 2
-    verification_dataset = verification_dataset.drop(columns=["PRSCS_LB", "PRSCS_UB"])
+    # Transformation rules for dataset
+    data_path = "datasets/initial_configurations_to_improve.csv"
+    verification_dataset = ut.prepare_dataset(data_path)
 
+    # Divide dataset for verification
     first_verification, second_verification = train_test_split(verification_dataset, test_size=0.5, random_state=42)
     first_verification = pd.DataFrame(first_verification).sample(n=n_data_to_verify) if len(first_verification) > n_samples else pd.DataFrame(first_verification)
     second_verification = pd.DataFrame(second_verification).sample(n=n_data_to_verify) if len(second_verification) > n_samples else pd.DataFrame(second_verification)
 
+    # First optimization and retrive data with model checker
     opt_results = opt_optimization(first_verification, regressor, f"regressor_{points_regressor}", skip_cache)
     opt_configs = opt_results.drop(columns=["SCS"])
     ground_truth_first_verificatation = mc_results_from_configs(opt_configs, ground_truth_regressor)
 
+    # Test accuracy of optimization
     stats = []
     invalid_configs, epsilon_array = validate_configurations(opt_results, ground_truth_first_verificatation)
     logger.debug(f"Mean epsilon before oversampling: {np.mean(epsilon_array)}")
     logger.debug(f"Number of invalid configurations: {len(invalid_configs)}")
     stats.append({"method": "no oversampling", "epsilon_array": epsilon_array})
 
+    # Second verification: 
+    # 3 possible configurations: 
+    # 1. Use the invalid configurations from the first verification
+    # 2. Use the the entire dataset of the first verification
+    # 3. Use a brand new dataset
     second_test = invalid_configs if final_validation_invalid_configs else first_verification
 
+    # Run oversampling, re-optimization and validation 
     methods_samples = oversampling_methods_parallel(invalid_configs=invalid_configs, previous_configs=first_verification, n_samples=n_samples, regressor=regressor)
     args = [(method, dataset, regressor, ground_truth_regressor, second_test, skip_cache) for method in methods_samples]
-
+    #Parallel running
     logger.debug("Starting the oversampling and validation process")
     start_time = time.time()
-
     with multiprocessing.Pool(processes=len(methods_samples)) as pool:
-        results = pool.starmap(process_oversampling_method, args)
+        results = pool.starmap(oversample_and_validation, args)
+
+    # Second verification
     if final_validation_invalid_configs:
+        # New optimization process: previous data + oversampling one
         second_validation_results = opt_optimization(second_test, regressor, f"invalid_configs_validation_{points_regressor}" if final_validation_invalid_configs else "second_validation", skip_cache)
         ground_truth_second_verificatation = mc_results_from_configs(second_validation_results.drop(columns=["SCS"]), ground_truth_regressor)
         invalid_configs, epsilon_array = validate_configurations(second_validation_results, ground_truth_second_verificatation)
@@ -151,6 +162,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, final_validation_inva
     logger.debug("Oversampling and validation process completed")
     logger.debug(f"Parallel processing took {end_time - start_time:.2f} seconds")
 
+    # Statistics about resampling
     stats.extend(results)
 
     logger.info("\nOversampling Summary:")
