@@ -1,6 +1,6 @@
 import pandas as pd
 from self_repair.oversampling import lime_based_resampling, random_oversampling, smote_oversampling
-from self_repair.validation import validate_configurations
+from self_repair.configuration_validation import validate_configurations
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 from typing import Dict
@@ -62,31 +62,35 @@ def oversampling_methods_parallel(invalid_configs: pd.DataFrame, previous_config
     results = [result for result in results if result["error"] == False]
     return results
 
-def oversample_and_validation(method: Dict, opt_samples_results: pd.DataFrame, regressor, ground_truth_regressor, test_dataset: pd.DataFrame, skip_cache = True) -> Dict:
-    
+# Run oversample method, re-optimizationa and validatio 
+def oversample_and_validation(method: Dict, previous_data: pd.DataFrame, regressor, ground_truth_regressor, test_dataset: pd.DataFrame, skip_cache = True) -> Dict:
     logger.debug(f"Oversampling via {method['method']}")
     new_samples = method["samples"]
-
+    
+    # Smote doesn't need to pass to mc. We already have y values.
     if method["method"] in ["Smote", "Smote-2"]:
         new_samples_results = pd.concat(
         [method["SCS"].to_frame(), new_samples], 
         axis=1)
     else:
         new_samples_results = mc_results_from_configs(new_samples, ground_truth_regressor)
-    oversampling = pd.concat([new_samples_results, opt_samples_results], ignore_index=True)
 
-    X = oversampling.drop(columns=["SCS"])
-    y = oversampling["SCS"]
+    # Create new dataset to retrain regressor
+    combined_dataset = pd.concat([previous_data, new_samples_results], ignore_index=True)
+    X = combined_dataset.drop(columns=["SCS"])
+    y = combined_dataset["SCS"]
 
+    #Train new regressor
     regressor_copy = clone(regressor)
     regressor_copy.fit(X, y)
 
     new_opt_configs_results = opt_optimization(test_dataset, regressor_copy, f"{method['method']}_{len(test_dataset)}", skip_cache)
     new_groundtruth = mc_results_from_configs(new_opt_configs_results.drop(columns=["SCS"]), ground_truth_regressor)
 
+    # Testing configuration after Re-optimization
     _, epsilon_array = validate_configurations(new_opt_configs_results, new_groundtruth)
-    logger.debug(f"{method['method']} oversampling concluded: mean epsilon was: {np.mean(epsilon_array)}")
 
+    logger.debug(f"{method['method']} oversampling concluded: mean epsilon was: {np.mean(epsilon_array)}")
     return {"method": method["method"], "epsilon_array": epsilon_array}
 
 def train_new_regressor(training_set: pd.DataFrame, points_regressor):
@@ -99,9 +103,8 @@ def train_new_regressor(training_set: pd.DataFrame, points_regressor):
     logger.debug("New regressor trained successfully")
     return regressor
 
-def run_oversampling_pipeline(n_data_to_verify, n_samples, final_validation_invalid_configs, points_regressor, skip_cache = True):
-    logger.info(f"Configuration: dataset_size:{n_data_to_verify}, oversampling size:{n_samples}, "f"{'invalid configuration for validation' if final_validation_invalid_configs else 'new dataset for validation'}")
-    
+def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_validation, points_regressor, skip_cache = True):
+    logger.info(f"Configuration: dataset_size:{n_data_to_verify}, oversampling size:{n_samples}, Second validation is with: {data_type_second_validation}")
     #Training dataset
     data_path = "datasets/dataset1000.csv"
     dataset = ut.prepare_dataset(data_path)
@@ -138,8 +141,14 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, final_validation_inva
     # 3 possible configurations: 
     # 1. Use the invalid configurations from the first verification
     # 2. Use the the entire dataset of the first verification
-    # 3. Use a brand new dataset
-    second_test = invalid_configs if final_validation_invalid_configs else first_verification
+    # 3. Use a brand new dataset    
+    if data_type_second_validation == "invalid_configs":
+        second_test = invalid_configs 
+    elif data_type_second_validation == "first_verification":
+        second_test = first_verification
+    else:
+        # Use the second verification dataset
+        second_test = second_verification
 
     # Run oversampling, re-optimization and validation 
     methods_samples = oversampling_methods_parallel(invalid_configs=invalid_configs, previous_configs=first_verification, n_samples=n_samples, regressor=regressor)
@@ -147,15 +156,17 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, final_validation_inva
     #Parallel running
     logger.debug("Starting the oversampling and validation process")
     start_time = time.time()
+    # Use multiprocessing to parallelize the oversampling, re-optimization and validation process
     with multiprocessing.Pool(processes=len(methods_samples)) as pool:
         results = pool.starmap(oversample_and_validation, args)
 
-    # Second verification
-    if final_validation_invalid_configs:
+    # Second verification. Is not always constant this part? It should be alwqays the same: 0%
+    if data_type_second_validation == "invalid_configs":
         # New optimization process: previous data + oversampling one
-        second_validation_results = opt_optimization(second_test, regressor, f"invalid_configs_validation_{points_regressor}" if final_validation_invalid_configs else "second_validation", skip_cache)
+        second_validation_results = opt_optimization(second_test, regressor, f"invalid_configs_validation_{points_regressor}", skip_cache)
         ground_truth_second_verificatation = mc_results_from_configs(second_validation_results.drop(columns=["SCS"]), ground_truth_regressor)
-        invalid_configs, epsilon_array = validate_configurations(second_validation_results, ground_truth_second_verificatation)
+        _, epsilon_array = validate_configurations(second_validation_results, ground_truth_second_verificatation)
+        
     stats.append({"method": "no oversampling - second verification", "epsilon_array": epsilon_array})
 
     end_time = time.time()
@@ -164,7 +175,6 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, final_validation_inva
 
     # Statistics about resampling
     stats.extend(results)
-
     logger.info("\nOversampling Summary:")
     for stat in stats:
         logger.info(f"{stat['method']:40} -> Mean epsilon: {np.mean(stat['epsilon_array']):.2f}")

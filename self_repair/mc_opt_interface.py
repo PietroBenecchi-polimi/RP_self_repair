@@ -1,7 +1,8 @@
 import pandas as pd
 from utils.rp_logger import logger
-from optimizer.NSGA_II_adapter import optimize_configurations
+from configurations_optimizer.NSGA_II_adapter import optimize_configurations
 import os
+
 def mc_results_from_configs(new_configs:pd.DataFrame, cache_file_name:str) -> pd.DataFrame:
     # Try fecthing in the cache
     try:
@@ -10,6 +11,7 @@ def mc_results_from_configs(new_configs:pd.DataFrame, cache_file_name:str) -> pd
         logger.warning(f"Cache miss on {cache_file_name}, MC will be used")
         result = pd.DataFrame(columns=pd.read_csv("datasets/initial_configurations_to_improve.csv").columns)
     return result
+
 def mc_results_from_configs(new_configs:pd.DataFrame, scs_ground_truth_regressor) -> pd.DataFrame:
     try:
         scs_y = scs_ground_truth_regressor.predict(new_configs)
