@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 import numpy as np
 import seaborn as sns
 from utils.rp_logger import logger
+
 def save_results(stats_per_points: List[Dict], save_path: str) -> None:
     """Save results to JSON file."""
     with open(save_path, "w") as f:
@@ -126,6 +127,42 @@ def visualize_comparison_violin(df_invalid: pd.DataFrame, df_standard: pd.DataFr
     plt.tight_layout()
     plt.savefig(f"tester/figs/combined_violin_r{r_points}_s{s_points}.png", dpi=300)
     plt.show()
+    
+def visualize_comparison_box(df_invalid: pd.DataFrame, df_standard: pd.DataFrame, r_points: int, s_points: int) -> None:
+    """Create a box plot showing both validation types for a specific configuration."""
+    df_invalid = df_invalid.copy()
+    df_standard = df_standard.copy()
+
+    # Combine the dataframes for the two validation types
+    combined_df = pd.concat([df_invalid, df_standard])
+
+    plt.figure(figsize=(12, 6))
+
+    # Create a box plot with the 'Method' on the x-axis, 'Epsilon' on the y-axis, 
+    # and 'Validation Type' as the hue for color differentiation.
+    ax = sns.boxplot(data=combined_df, x='Method', y='Epsilon', hue='Validation Type',
+                     palette='muted', fliersize=5, linewidth=2)
+
+    # Add mean lines per method and validation type
+    for method in combined_df['Method'].unique():
+        for val_type in ['Invalid Configs', 'Standard']:
+            mean_val = combined_df[(combined_df['Method'] == method) & 
+                                   (combined_df['Validation Type'] == val_type)]['Epsilon'].mean()
+            xpos = list(combined_df['Method'].unique()).index(method)
+            offset = -0.2 if val_type == 'Invalid Configs' else 0.2
+            ax.plot([xpos + offset - 0.05, xpos + offset + 0.05],
+                    [mean_val, mean_val],
+                    color='red', linewidth=2)
+
+    plt.title(f"Validation Comparison — Regressor: {r_points}, Resampling: {s_points}", fontsize=14)
+    plt.xlabel("Oversampling Method", fontsize=12)
+    plt.ylabel("Epsilon", fontsize=12)
+    plt.xticks(rotation=45)
+    plt.grid(True, axis='y', linestyle=':', alpha=0.7)
+    plt.legend(title='Validation Type')
+    plt.tight_layout()
+    plt.savefig(f"tester/figs/combined_box_r{r_points}_s{s_points}.png", dpi=300)
+    plt.show()
 
 def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame) -> None:
     """Plot epsilon vs. resampling points separately for each validation type."""
@@ -176,6 +213,7 @@ def main():
     invalid_stats = run_experiments(regressor_points, resampling_points, True)
 
     df_standard = process_results(standard_stats)
+
     df_invalid = process_results(invalid_stats)
     
     df_invalid['Validation Type'] = 'Invalid Configs'
