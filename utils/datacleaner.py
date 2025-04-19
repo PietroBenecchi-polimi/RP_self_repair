@@ -6,11 +6,11 @@ from utils.rp_logger import logger
 # Transformation rules
 transform_rules = {
     'HUM_1_FW': {'free': 2.0, 'foc': 0.0, 'distr': 1.0},
-    'HUM_1_AGE': {'y': 0.0, 'e': 1.0},
-    'HUM_1_STA': {'s': 1.0, 'h': 0.0, 'u': 2.0},
+    'HUM_1_AGE': {'y': 0, 'e': 1},
+    'HUM_1_STA': {'s': 1, 'h': 0, 'u': 2},
     'HUM_2_FW': {'free': 2.0, 'foc': 0.0, 'distr': 1.0},
-    'HUM_2_AGE': {'y': 0.0, 'e': 1.0},
-    'HUM_2_STA': {'s': 1.0, 'h': 0.0, 'u': 2.0},
+    'HUM_2_AGE': {'y': 0, 'e': 1},
+    'HUM_2_STA': {'s': 1, 'h': 0, 'u': 2},
 }
 
 # Reverse rules
