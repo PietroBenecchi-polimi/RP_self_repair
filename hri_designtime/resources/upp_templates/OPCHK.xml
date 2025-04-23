@@ -1,0 +1,497 @@
+<template>
+    <name>OpChk</name>
+    <parameter>int id, int T_int, int T_proc</parameter>
+    <declaration>
+clock t_act;
+
+
+//Human-Robot Distance Parameters
+const double safetyDistance = 2.0;
+const double stopDistance = 6.0;
+const double restartDistance = 3.0;
+int recipientStages = 0;
+
+//Recharging Policy Parameters
+const double rechargingTh = 11.1;
+const double stopRechargingTh = 11.4;
+const double failBattery = 11.0;
+
+//Fatigue-Monitoring Parameters
+const double failFatigue = 0.97;
+const double stopFatigue = 0.6;
+const double resumeFatigue = 0.3;
+
+
+/**
+* Init
+**/
+
+void initialize() {
+    if (currR == id) stop[currR-1] = false;
+    else if (coR == id) stop[coR-1] = false;
+    exeRobot=false;
+    stopHuman= false;
+    startHuman=false;
+}
+
+/**
+* Pattern-Specific Logics
+**/
+
+bool getStart(int pattern) {
+    double humanRobotDist = calculateDistance();
+    double dist_to_dest = pt_dist(robPositionX[currR-1], dX[currR-1], robPositionY[currR-1], dY[currR-1]);
+    double dist = 100.0*1.2;
+
+    if(pattern==0) { //start cond. for follower
+        if (humanRobotDist&gt;=stopDistance)  //if human and robot are too distant
+            return batteryCharge[id-1]&gt;=rechargingTh; //starts if battery is sufficient
+        else return batteryCharge[id-1]&gt;=rechargingTh &amp;&amp; //starts if battery is sufficient,
+                ((!stopHuman &amp;&amp; humanRobotDist&lt;=restartDistance) || //if human and robot are close again,
+                (stopHuman &amp;&amp; humanFatigue[currH-1]&lt;=resumeFatigue)); //or if human has rested enough
+    }
+    else if(pattern==1) // start cond. for leader
+        return hExe; //starts if human has started
+    else if(pattern==2) // start cond. for recipient
+        return batteryCharge[id-1]&gt;=rechargingTh; // starts if battery is sufficient
+    else if(pattern==3)
+        return batteryCharge[id-1]&gt;rechargingTh &amp;&amp;
+    (pt_dist(robPositionX[currR-1], destX[currH-1], robPositionY[currR-1], destY[currH-1]) &lt;= dist &amp;&amp;
+    pt_dist(humanPositionX[currH-1], destX[currH-1], humanPositionY[currH-1], destY[currH-1]) &lt;= dist ||
+                                                                                                    pt_dist(robPositionX[currR-1], destX[currH-1], robPositionY[currR-1], destY[currH-1]) &gt; dist) ;
+    else if(pattern == 10)// start cond. for interdependence by contract
+        return batteryCharge[id-1]&gt;=rechargingTh;//start if battery is sufficient
+    else if(pattern == 12) // start cond. for competition
+        return batteryCharge[id-1]&gt;=rechargingTh;
+    else
+    return false;
+}
+
+double humanRobotDist;
+void setOpParams(int pattern) {
+    humanRobotDist = calculateDistance();
+    exeRobot= false;
+    // operational parameters (destination for robot, and op. state)
+    if (pattern==0) { //follower
+        currOp[currR-1] = 4;
+        if (humanRobotDist&lt;=stopDistance) { //if human and robot are close,
+            dX[currR-1] = destX[currH-1]; // move towards destination
+            dY[currR-1] = destY[currH-1];
+        } else { // !! ONLINE RECONFIGURATION FEATURE !!
+            dX[currR-1] = humanPositionX[currH-1]; //if human and robot are distant,
+            dY[currR-1] = humanPositionY[currH-1]; //move towards human
+        }
+    } else if (pattern==1) { //leader
+        currOp[currR-1] = 5;
+        dX[currR-1] = humanPositionX[currH-1]; // follow human
+        dY[currR-1] = humanPositionY[currH-1];
+    } else if (pattern==2) { //recipient
+        currOp[currR-1] = 4;
+        recipientStages = 1;
+        dX[currR-1] = destX[currH-1]; // move towards object location
+        dY[currR-1] = destY[currH-1];
+    } else if (pattern==3){
+        double dist_to_dest = pt_dist(robPositionX[currR-1], destX[currH-1], robPositionY[currR-1], destY[currH-1]);
+        if (dist_to_dest &gt; 50.0) {
+            currOp[id-1]=4;
+            dX[currR-1] = destX[currH-1];
+            dY[currR-1] = destY[currH-1];
+        }
+        else {
+            currOp[currR-1]=6;
+            exeRobot=true;
+        }
+    } else if(pattern==10) { // interdependence by contract
+        currOp[currR-1] = 4;
+        //The robot shouldn't move ==&gt; set dest to initial position of robot
+        dX[currR-1] = destX[currH-1];
+        dY[currR-1] = destY[currH-1];
+    } else if(pattern==12) { // competition
+        currOp[currR-1] = 4;
+        dX[currR-1] = destX[currH-1]; // move towards object location
+        dY[currR-1] = destY[currH-1];
+    }
+}
+
+bool getStop(int pattern) {
+    double humanRobotDist = pt_dist(robPositionX[currR-1], humanPositionX[currH-1], robPositionY[currR-1],
+                                    humanPositionY[currH-1])/100;
+    double dist_to_dest = pt_dist(robPositionX[currR-1], dX[currR-1], robPositionY[currR-1], dY[currR-1]);
+    double dist = 100.0*2.0;
+
+    if(pattern==0) { // stop cond. for follower
+        if(dX[currR-1]==destX[currH-1] &amp;&amp; dY[currR-1]==destY[currH-1]) { //if currently moving towards destination
+            stopHuman = humanFatigue[currH-1]&gt;=stopFatigue; //stop human if too fatigued
+            // stop robot if close to destination, human is too tired or too distant
+            return dist_to_dest&lt;=dist || stopHuman || humanRobotDist&gt;=stopDistance;
+        } else
+        return humanRobotDist&lt;=restartDistance ||
+            (dX[currR-1] == rechargeStation[0] &amp;&amp; dY[currR-1] == rechargeStation[1] &amp;&amp; dist_to_dest&lt;=dist); // else stop if close to human or recharge station
+    } else if (pattern==1) // stop cond. for leader
+        return dist_to_dest&lt;=dist || (!hExe &amp;&amp; dist_to_dest&lt;=dist); // stop if human has stopped
+    else if (pattern==2 || pattern==3){ // stop cond. for recipient
+        return dist_to_dest&lt;=dist; // stop if close to destination
+    } else if (pattern==10)// interdependence by contract
+        return !hExe;
+    else if (pattern==12) // competition
+        return dist_to_dest&lt;=dist;
+    else
+    return false;
+}
+
+/**
+* Operating Mode Checks
+**/
+
+void check_r_rech(){
+    if(batteryCharge[currR-1]&gt;=stopRechargingTh) //if recharging, stop when recharged
+    stop[currR-1] = true;
+}
+
+void check_fail(){
+    // mission fails if battery gets to 0, or human passes out
+    if(batteryCharge[id-1]&lt;=failBattery ||
+                               humanFatigue[currH-1]&gt;=failFatigue) {
+        fail = true;
+        currOp[currR-1] = 0;
+    }
+}
+
+void check_scs(){
+    // mission is accomplished if all humans are served
+    if(served[H-1]) {
+        scs = true;
+        currOp[currR-1] = 0;
+    }
+}
+
+void check_h_move(){
+    stop[currR-1] = getStop(patterns[currH-1]);
+
+    if(!stop[currR-1]) {
+        dX[currR-1] = humanPositionX[currH-1];
+        dY[currR-1] = humanPositionY[currH-1];
+    }
+}
+
+void check_r_move(){
+    // stop moving if battery is low and start task handover
+    if(currOp[currR-1]==4 &amp;&amp; batteryCharge[currR-1]&lt;=rechargingTh) {
+        stop[currR-1] = true;
+        if (patterns[currH-1]==3 || patterns[currH-1]==0) stopHuman=true;
+        return;
+    }
+
+    stop[currR-1] = getStop(patterns[currH-1]);
+
+    // if human is a recipient, and robot has arrived to
+    // its current destination
+    if(patterns[currH-1]==2 &amp;&amp; stop[currR-1]) {
+        // if it is the first stage, move on to the second one
+        // and reach the human
+        if(recipientStages==1) {
+            stop[currR-1] = false;
+            stopHuman = false;
+            dX[currR-1] = humanPositionX[currH-1];
+            dY[currR-1] = humanPositionY[currH-1];
+            recipientStages++;
+        }
+    }
+}
+
+int select_coR() {
+    int i, closest= -1;
+    double dist, min_dist = 100000.0;
+    if(R&gt;=2) {
+        for(i=0; i &lt; R; i++) {
+            dist = pt_dist(robPositionX[currR-1], robPositionX[i], robPositionY[currR-1], robPositionY[i]);
+            if(dist &lt; min_dist &amp;&amp; i != (currR-1) &amp;&amp; !busy[i]) {
+                min_dist = dist;
+                closest = i;
+            }
+        }
+        return closest+1;
+    } else return closest;
+}
+
+bool start;
+void check_start(){
+    int tmp, coR_choice;
+    bool isCoRobotAvailable;
+
+    // if battery charge is low, move to rech. mode
+    if(batteryCharge[currR-1]&lt;=rechargingTh) {
+        dX[currR-1] = rechargeStation[0];
+        dY[currR-1] = rechargeStation[1];
+        coR_choice = select_coR();
+        isCoRobotAvailable = coR_choice &gt; 0;
+        if (isCoRobotAvailable){
+            currOp[currR-1] = 7;
+            coR = coR_choice;
+            //if (currR == 1) coR = 2;
+            //else coR = 1;
+            currOp[coR-1] = 7;
+            dX[coR-1] = robPositionX[currR-1];
+            dY[coR-1] = robPositionY[currR-1];
+            active_robot[coR-1] = true;
+            synch = true;
+        }
+        else{
+            currOp[currR-1] = 2;
+            stop[currR-1] = true;
+        }
+        return;
+    }
+
+    start = getStart(patterns[currH-1]);
+    if(start) {
+        setOpParams(patterns[currH-1]);
+        // human can start if it is a follower, rob is not recharging
+        // and everybody is moving towards the destination (i.e., robot is not going back towards the human)
+        // note: the leader does not need this boolean, because it does not "wait" for start_h_action to fire
+        startHuman = (currOp[currR-1]==4 &amp;&amp; patterns[currH-1]!=2 &amp;&amp; patterns[currH-1]!=3 &amp;&amp;
+        dX[currR-1]==destX[currH-1] &amp;&amp; dY[currR-1]==destY[currH-1]) || currOp[currR-1]==6;
+        stop[currR-1] = true;
+    }
+}
+
+void check_hr_mission(){
+    if (served[currH-1]){
+        stop[currR-1] = true;
+        stopHuman=false;
+        return;
+    }
+    if (batteryCharge[id-1]&lt;=rechargingTh){
+        stop[currR-1]=true;
+        stopHuman=true;
+        return;
+    }
+    if (!hExe) stop[currR-1]=true;
+}
+
+void check_service_provided() {
+    double eps = 200.0, dist_to_dest, humanRobotDist;
+
+    dist_to_dest = pt_dist(robPositionX[currR-1], destX[currH-1], robPositionY[currR-1], destY[currH-1]);
+    humanRobotDist = calculateDistance();
+
+    if(patterns[currH-1]==0
+       &amp;&amp; dist_to_dest &lt;= eps
+                                     &amp;&amp; humanRobotDist &lt;= eps/100*2) { // if follower is close to robot and both are close to destination
+        served[currH-1] = true;
+        stopHuman = true;
+        if(currH&lt;H &amp;&amp; patterns[currH]!=1)
+        currH++;
+    }
+    else if((patterns[currH-1]==1 || patterns[currH-1]==3 || patterns[currH-1]==12) &amp;&amp; served[currH-1]) // if leader has set themselves as served
+        currH++;
+    else if(patterns[currH-1]==10 &amp;&amp; task_size &lt;= task_completion){
+        served[currH-1] = true;
+        stopHuman = true;
+        if(currH&lt;H &amp;&amp; patterns[currH]!=1)
+        currH++;
+    }
+}
+
+/***********coR functions**************/
+
+void check_r_move_coR(){
+    //check if the coR has reached the recharging station
+    double dist_to_dest = pt_dist(robPositionX[coR-1], dX[coR-1], robPositionY[coR-1], dY[coR-1]);
+    double dist = 150.0;
+    stop[coR-1] = dist_to_dest &lt;= dist;
+}
+
+void check_r_rech_coR(){
+    if(batteryCharge[coR-1]&gt;=stopRechargingTh) //if recharging, stop when recharged
+    stop[coR-1] = true;
+}
+
+void needs_recharging_coR(){
+    stop[coR-1] = true;
+    currOp[coR-1] = 2;
+    dX[coR-1] = rechargeStation[0];
+    dY[coR-1] = rechargeStation[1];
+}
+
+
+void check_r_sync(){
+    double dist_to_dest = pt_dist(robPositionX[coR-1], dX[coR-1], robPositionY[currR-1], dY[currR-1]);
+    double dist = 150.0;
+    if (dist_to_dest &lt;= dist) {
+        synch = false;
+        stop[coR-1] = true;
+    }
+}
+
+/**
+* SAFETY DISTANCE ERROR
+**/
+
+void check_crit_op() {
+    double humanRobotDist;
+    humanRobotDist = calculateDistance();
+    is_crit = humanRobotDist &lt;= safetyDistance;
+}
+
+/**
+* MAIN LOOP
+**/
+
+void check_actions() {
+    if (currR == id) {
+        check_scs();
+        if( scs )
+            return;
+
+        check_fail();
+        if( fail )
+            return;
+
+        check_crit_op();
+
+        if( currOp[currR-1]==1 ) // system idle, waiting for an action to start
+            check_start();
+        else if( currOp[currR-1]==2 || currOp[currR-1]==4 ) // robot moving to rech. station (currOp=2), or leading (currOp=4)
+            check_r_move();
+        else if( currOp[currR-1]==3 ) // robot recharging
+            check_r_rech();
+        else if( currOp[currR-1]==5 ) // robot following
+            check_h_move();
+        else if ( currOp[currR-1]==6 )
+            check_hr_mission();
+        else if ( currOp[currR-1]==7 )
+            /*waiting co-robot synchronization*/;
+
+        check_service_provided();
+    }
+    else if (coR == id){
+        if( currOp[currR-1]==1 ) // system idle, waiting for an eventual synchronization with the current robot
+            /*nothing*/;
+        else if ( currOp[coR-1]==2 ) // co-robot moving to rech. station
+            check_r_move_coR();
+        else if ( currOp[coR-1]==3 ) // co-robot recharging
+            check_r_rech_coR();
+        else if ( currOp[coR-1]==4 )
+            needs_recharging_coR();
+        else if ( currOp[coR-1]==7 ) //// co-robot reaching current robot
+            check_r_sync();
+    }
+}
+</declaration>
+    <location id="id157" x="-663" y="-366">
+        <name x="-705" y="-399">op</name>
+        <label kind="invariant" x="-773" y="-374">t_act&lt;=T_int</label>
+    </location>
+    <location id="id158" x="-238" y="-366">
+        <name x="-221" y="-391">chk</name>
+        <label kind="invariant" x="-221" y="-365">t_act&lt;=T_proc</label>
+    </location>
+    <location id="id159" x="-442" y="-527">
+        <name x="-452" y="-561">off</name>
+    </location>
+    <location id="id160" x="-451" y="-222">
+        <committed/>
+    </location>
+    <location id="id161" x="-238" y="-459">
+        <committed/>
+    </location>
+    <location id="id162" x="-136" y="-459">
+        <committed/>
+    </location>
+    <init ref="id159"/>
+    <transition>
+        <source ref="id162"/>
+        <target ref="id159"/>
+        <label kind="synchronisation" x="-195" y="-518">opchk_scs!</label>
+        <nail x="-144" y="-467"/>
+        <nail x="-238" y="-527"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id162"/>
+        <label kind="guard" x="-127" y="-450">!stop[id-1] &amp;&amp; scs
+        &amp;&amp; t_act&gt;=T_proc</label>
+        <label kind="assignment" x="-127" y="-416">active_robot[id-1] = true</label>
+        <nail x="-136" y="-365"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id161"/>
+        <label kind="guard" x="-382" y="-459">stop[id-1] &amp;&amp; !scs
+        &amp;&amp; t_act&gt;=T_proc</label>
+        <label kind="assignment" x="-382" y="-425">active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id160"/>
+        <target ref="id159"/>
+        <label kind="synchronisation" x="-25" y="-552">opchk_fail!</label>
+        <label kind="assignment" x="-25" y="-527">fail = true</label>
+        <label kind="comments" x="-433" y="-200">active_robot[id-1] is not set true because the synch messagge
+        opchk_fail is not received by anyone</label>
+        <nail x="59" y="-229"/>
+        <nail x="59" y="-527"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id160"/>
+        <label kind="guard" x="-229" y="-314">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-289" y="-255">h_fail?</label>
+        <label kind="assignment" x="-229" y="-297">active_robot[id-1] = false</label>
+        <nail x="-238" y="-263"/>
+    </transition>
+    <transition>
+        <source ref="id157"/>
+        <target ref="id160"/>
+        <label kind="guard" x="-824" y="-314">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-629" y="-246">h_fail?</label>
+        <label kind="assignment" x="-824" y="-297">active_robot[id-1] = false</label>
+        <nail x="-663" y="-263"/>
+    </transition>
+    <transition>
+        <source ref="id161"/>
+        <target ref="id159"/>
+        <label kind="synchronisation" x="-331" y="-501">opchk_stop!</label>
+        <nail x="-238" y="-527"/>
+    </transition>
+    <transition>
+        <source ref="id159"/>
+        <target ref="id157"/>
+        <label kind="guard" x="-748" y="-578">active_robot[id-1] == true &amp;&amp;
+        (currR == id || coR == id)</label>
+        <label kind="synchronisation" x="-697" y="-544">opchk_start?</label>
+        <label kind="assignment" x="-748" y="-527">initialize(), t_act=0,
+        active_robot[id-1] = false</label>
+        <nail x="-663" y="-527"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id160"/>
+        <label kind="guard" x="-229" y="-314">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-365" y="-297">dead_battery?</label>
+        <label kind="assignment" x="-229" y="-297">active_robot[id-1] = false</label>
+        <nail x="-263" y="-280"/>
+    </transition>
+    <transition>
+        <source ref="id157"/>
+        <target ref="id160"/>
+        <label kind="guard" x="-824" y="-314">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-629" y="-297">dead_battery?</label>
+        <label kind="assignment" x="-824" y="-297">active_robot[id-1] = false</label>
+        <nail x="-637" y="-280"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id157"/>
+        <label kind="guard" x="-527" y="-340">!stop[id-1] &amp;&amp; !scs
+        &amp;&amp; t_act&gt;=T_proc</label>
+        <label kind="assignment" x="-476" y="-306">t_act=0</label>
+        <nail x="-450" y="-323"/>
+    </transition>
+    <transition>
+        <source ref="id157"/>
+        <target ref="id158"/>
+        <label kind="guard" x="-501" y="-408">t_act&gt;=T_int</label>
+        <label kind="assignment" x="-501" y="-391">check_actions(), t_act=0</label>
+    </transition>
+</template>

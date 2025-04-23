@@ -1,0 +1,427 @@
+<template>
+<name>Robot</name>
+<parameter>int id, double _v_max, double _a_max, double posX, double posY</parameter>
+<declaration>
+clock V, Th, tUpd;
+
+trajectory traj = **N_P_0.0**
+
+double ort = 0.0;
+int curr_traj = 0;
+
+// Position Sharing parameters
+int t = 0;
+const int T_poll = 1;
+int v_max;
+int a_max;
+
+bool needsTurning = false;
+void change_orientation(double sx, double sy, double dx, double dy) {
+	double cos_alpha, alpha, theta, delta;
+	double AC, AB;
+	bool turnLeft;
+
+	AC = pt_dist(sx, dx, sy, sy);
+	AB = pt_dist(sx, dx, sy, dy);
+
+	if (AB == 0)
+	{
+		return;
+	}
+
+	cos_alpha = AC / AB;
+	// angle between destination and hor. line
+	alpha = acos(cos_alpha);
+	// angle between robot axis and hor. line
+	theta = ort * 180 / PI;
+	// how much the robot should rotate [deg]
+	delta = 0.0;
+	turnLeft = false;
+
+	if (dx &gt;= sx &amp;&amp; dy &gt;= sy)
+	{ // Destination in 1st quadrant
+		alpha = alpha * (180 / PI);
+		if (alpha &gt; theta)
+		{
+			delta = alpha - theta;
+			turnLeft = true;
+		}
+		else
+		{
+			delta = theta - alpha;
+			turnLeft = false;
+		}
+	}
+	else if (dx &gt;= sx &amp;&amp; dy &lt;= sy)
+	{ // Destination in 2nd quadrant
+		alpha = -alpha * (180 / PI);
+		if (theta &lt; alpha)
+		{
+			delta = alpha - theta;
+			turnLeft = true;
+		}
+		else
+		{
+			delta = theta - alpha;
+			turnLeft = false;
+		}
+	}
+	else if (dx &lt;= sx &amp;&amp; dy &lt;= sy)
+	{ // Destination in 3rd quadrant
+		alpha = -(180 - alpha * (180 / PI));
+		if (theta &lt; alpha)
+		{
+			delta = alpha - theta;
+			turnLeft = true;
+		}
+		else
+		{
+			delta = theta - alpha;
+			turnLeft = false;
+		}
+	}
+	else if (dx &lt;= sx &amp;&amp; dy &gt;= sy)
+	{ // Destination in 4th quadrant
+		alpha = 180 - alpha * (180 / PI);
+		if (theta &lt; alpha)
+		{
+			delta = alpha - theta;
+			turnLeft = true;
+		}
+		else
+		{
+			delta = theta - alpha;
+			turnLeft = false;
+		}
+	}
+
+	needsTurning = delta &gt; 0.0;
+
+	if (needsTurning &amp;&amp; turnLeft)
+	{
+		ort = ort * 180 / PI + delta;
+	}
+	else if (needsTurning &amp;&amp; !turnLeft)
+	{
+		ort = ort * 180 / PI - delta;
+	}
+}
+
+point curr, dest;
+void plan_traj() {
+	int i, j, next_inters = -1;
+	int neigh[**max_neigh**] = **max_neigh_-1**
+	int	k = 0;
+	double dist, min_dist;
+	bool visited[N_I] = **N_I_false**
+	bool close;
+	curr[0] = internalRobX[id-1]; curr[1] = internalRobY[id-1];
+	dest[0] = dX[id-1]; dest[1] = dY[id-1];
+	// init trajectory
+	for (i = 0; i &lt; N_P; i++)
+	{
+		traj[i][0] = 0.0;
+		traj[i][1] = 0.0;
+	}
+	i = 0;
+	curr_traj = 0;
+
+	// builds trajectory by finding a path among adjacent areas
+	// (the existence of an intersection point means two areas are adjacent to each other)
+	// until the destination area is reached
+	close = same_area(curr[0], curr[1], dest[0], dest[1]);
+	while (!close)
+	{
+		for (j = 0; j &lt; N_I &amp;&amp; k&lt;3; j++)
+		{
+			// find all int. pts which are a neighbor of curr. point
+			// there are max. 3 in the long left hall
+			if (same_area(curr[0], curr[1], INTERSECTIONS[j][0], INTERSECTIONS[j][1]) &amp;&amp; !visited[j])
+			{
+				neigh[k] = j;
+				k++;
+			}
+		}
+		if(neigh[0]==-1) close = true;
+		else {
+		// next int. point to add to traj. is the closest to destination
+		min_dist = pt_dist(INTERSECTIONS[neigh[0]][0], dest[0], INTERSECTIONS[neigh[0]][1], dest[1]);
+		next_inters = neigh[0];
+		for (j = 1; j &lt; **max_neigh** &amp;&amp; neigh[j] != -1; j++)
+		{
+			dist = pt_dist(INTERSECTIONS[neigh[j]][0], dest[0], INTERSECTIONS[neigh[j]][1], dest[1]);
+			if (dist &lt; min_dist)
+			{
+				min_dist = dist;
+				next_inters = neigh[j];
+			}
+		}
+		// if trajectory is full, or no next point has been found,
+		// something has gone wrong, but I cannot raise an exception
+		if (i == N_P - 1 || next_inters == -1)
+			return;
+		// next inters point is set as visited,
+		visited[next_inters] = true;
+		// added to the trajectory,
+		traj[i][0] = INTERSECTIONS[next_inters][0];
+		traj[i][1] = INTERSECTIONS[next_inters][1];
+		i++;
+		// and set as current point
+		curr[0] = INTERSECTIONS[next_inters][0];
+		curr[1] = INTERSECTIONS[next_inters][1];
+		// reset
+		next_inters = -1;
+		k = 0;
+		for(j=0; j&lt;**max_neigh**;j++) neigh[j] = -1;
+		close = same_area(curr[0], curr[1], dest[0], dest[1]);
+		}
+	}
+	// destination point is always part of the trajectory
+	traj[i][0] = dest[0];
+	traj[i][1] = dest[1];
+
+	//sets initial orientation
+	change_orientation(internalRobX[id-1], internalRobY[id-1], traj[0][0], traj[0][1]);
+}
+
+void update_pos(double coeff) {
+	internalRobX[id-1] = internalRobX[id-1] + coeff*Tpoll*cos(ort*PI/180);
+	internalRobY[id-1] = internalRobY[id-1] + coeff*Tpoll*sin(ort*PI/180);
+}
+
+void initRobot() {
+	t = 0;
+	V = 0;
+	robPositionX[id-1] = posX;
+	robPositionY[id-1] = posY;
+	internalRobX[id-1] = posX;
+	internalRobY[id-1] = posY;
+	tUpd=0;
+	v_max = fint(_v_max);
+	a_max = fint(_a_max);
+}
+
+void varsUpdate(double coeff) {
+	tUpd = 0;
+
+	if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+		return;
+
+	if (pt_dist(internalRobX[id-1], traj[curr_traj][0], internalRobY[id-1], traj[curr_traj][1]) &lt; v_max*1.1) {
+		curr_traj++;
+		if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+			plan_traj();
+		change_orientation(internalRobX[id-1], internalRobY[id-1], traj[curr_traj][0], traj[curr_traj][1]);
+	}
+
+	update_pos(coeff);
+}
+</declaration>
+	<location id="id104" x="-629" y="-348">
+		<name x="-672" y="-365">idle</name>
+		<label kind="invariant" x="-722" y="-348">V' == 0 &amp;&amp;
+tUpd'==0</label>
+	</location>
+	<location id="id105" x="-424" y="-144">
+		<name x="-501" y="-144">stopping</name>
+		<label kind="invariant" x="-603" y="-144">V' == -a_max
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		<label kind="comments" x="-603" y="-110">&amp;&amp; V &gt;=0</label>
+	</location>
+	<location id="id106" x="-425" y="-348">
+		<name x="-408" y="-366">starting</name>
+		<label kind="invariant" x="-348" y="-382">V' == a_max
+&amp;&amp; V &lt;= v_max
+&amp;&amp; tUpd&lt;=Tpoll</label>
+	</location>
+	<location id="id107" x="-161" y="-246">
+		<name x="-229" y="-263">moving</name>
+		<label kind="invariant" x="-263" y="-246">V' == 0 &amp;&amp;
+tUpd&lt;=Tpoll</label>
+	</location>
+	<location id="id108" x="-629" y="-527">
+		<name x="-639" y="-561">Init</name>
+		<committed/>
+	</location>
+	<location id="id109" x="-850" y="-459">
+		<name x="-943" y="-467">recharging</name>
+		<label kind="invariant" x="-926" y="-450">V'==0 &amp;&amp;
+tUpd'==0</label>
+	</location>
+	<location id="id110" x="195" y="-246">
+		<name x="212" y="-272">turning</name>
+		<label kind="invariant" x="212" y="-255">V'==0 &amp;&amp;
+Th&lt;=fabs(ort*PI/180)</label>
+	</location>
+	<location id="id111" x="51" y="-246">
+		<committed/>
+	</location>
+	<location id="id112" x="-425" y="-527">
+		<committed/>
+	</location>
+	<location id="id113" x="-425" y="76">
+		<committed/>
+	</location>
+	<location id="id114" x="-59" y="-204">
+		<committed/>
+	</location>
+	<location id="id115" x="-629" y="-144">
+		<committed/>
+	</location>
+	<init ref="id108"/>
+	<transition>
+		<source ref="id105"/>
+		<target ref="id115"/>
+		<label kind="guard" x="-612" y="-187">V &lt;= 0</label>
+		<label kind="assignment" x="-612" y="-170">active_robot[id-1] = true</label>
+	</transition>
+	<transition>
+		<source ref="id114"/>
+		<target ref="id107"/>
+		<label kind="synchronisation" x="-153" y="-229">publish_m[id]!</label>
+	</transition>
+	<transition>
+		<source ref="id111"/>
+		<target ref="id114"/>
+		<label kind="guard" x="-25" y="-229">!needsTurning</label>
+		<label kind="assignment" x="-25" y="-212">tUpd=0</label>
+	</transition>
+	<transition>
+		<source ref="id113"/>
+		<target ref="id105"/>
+		<label kind="synchronisation" x="-561" y="-42">publish_m[id]!</label>
+		<nail x="-459" y="17"/>
+		<nail x="-459" y="-85"/>
+	</transition>
+	<transition>
+		<source ref="id112"/>
+		<target ref="id106"/>
+		<label kind="synchronisation" x="-382" y="-467">publish_m[1]!</label>
+		<nail x="-391" y="-484"/>
+		<nail x="-391" y="-399"/>
+	</transition>
+	<transition>
+		<source ref="id105"/>
+		<target ref="id113"/>
+		<label kind="guard" x="-416" y="-25">tUpd&gt;=Tpoll
+&amp;&amp;V&gt;0</label>
+		<label kind="assignment" x="-416" y="8">t+=Tpoll, tUpd=0,
+varsUpdate(v_max-a_max*t)</label>
+	</transition>
+	<transition>
+		<source ref="id106"/>
+		<target ref="id112"/>
+		<label kind="guard" x="-527" y="-476">tUpd&gt;=Tpoll
+&amp;&amp;V&lt;v_max</label>
+		<label kind="assignment" x="-569" y="-442">t+=Tpoll, tUpd=0,
+varsUpdate(a_max*t)</label>
+	</transition>
+	<transition>
+		<source ref="id110"/>
+		<target ref="id105"/>
+		<label kind="guard" x="-119" y="-178">active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-331" y="-161">stop_r_action?</label>
+		<label kind="assignment" x="-119" y="-144">tUpd=0, t=0,
+active_robot[id-1] = false</label>
+		<nail x="195" y="-144"/>
+	</transition>
+	<transition>
+		<source ref="id110"/>
+		<target ref="id107"/>
+		<label kind="guard" x="-85" y="-365">Th&gt;=fabs(ort*PI/180)</label>
+		<label kind="assignment" x="-85" y="-348">tUpd = 0, Th = 0,
+needsTurning = false</label>
+		<nail x="195" y="-348"/>
+		<nail x="-161" y="-348"/>
+	</transition>
+	<transition>
+		<source ref="id111"/>
+		<target ref="id110"/>
+		<label kind="guard" x="67" y="-263">needsTurning</label>
+		<label kind="assignment" x="67" y="-246">Th=0</label>
+	</transition>
+	<transition>
+		<source ref="id107"/>
+		<target ref="id111"/>
+		<label kind="guard" x="-110" y="-280">tUpd&gt;=Tpoll</label>
+		<label kind="assignment" x="-119" y="-263">varsUpdate(v_max)</label>
+	</transition>
+	<transition>
+		<source ref="id105"/>
+		<target ref="id106"/>
+		<label kind="guard" x="-416" y="-323">V&gt;0 &amp;&amp;
+active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-416" y="-289">start_r_action?</label>
+		<label kind="assignment" x="-416" y="-272">t=0, tUpd=0,
+plan_traj(),
+active_robot[id-1] = false</label>
+	</transition>
+	<transition>
+		<source ref="id106"/>
+		<target ref="id105"/>
+		<label kind="guard" x="-603" y="-289">V&lt;v_max &amp;&amp;
+active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-603" y="-255">stop_r_action?</label>
+		<label kind="assignment" x="-603" y="-238">t=0, tUpd=0,
+active_robot[id-1] = false</label>
+		<nail x="-459" y="-323"/>
+		<nail x="-459" y="-161"/>
+	</transition>
+	<transition>
+		<source ref="id109"/>
+		<target ref="id104"/>
+		<label kind="guard" x="-816" y="-510">active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-816" y="-493">stop_recharging?</label>
+		<label kind="assignment" x="-816" y="-476">tUpd=0,
+active_robot[id-1] = false</label>
+		<nail x="-629" y="-459"/>
+	</transition>
+	<transition>
+		<source ref="id104"/>
+		<target ref="id109"/>
+		<label kind="synchronisation" x="-842" y="-416">start_recharging[id]?</label>
+		<nail x="-850" y="-348"/>
+	</transition>
+	<transition>
+		<source ref="id115"/>
+		<target ref="id104"/>
+		<label kind="synchronisation" x="-680" y="-221">r_still!</label>
+		<label kind="assignment" x="-680" y="-204">t=0,
+tUpd = 0,
+V=0</label>
+		<nail x="-629" y="-161"/>
+		<nail x="-629" y="-161"/>
+	</transition>
+	<transition>
+		<source ref="id107"/>
+		<target ref="id105"/>
+		<label kind="guard" x="-331" y="-178">active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-119" y="-161">stop_r_action?</label>
+		<label kind="assignment" x="-331" y="-144">tUpd=0, t=0,
+active_robot[id-1] = false</label>
+		<nail x="-160" y="-144"/>
+	</transition>
+	<transition>
+		<source ref="id106"/>
+		<target ref="id107"/>
+		<label kind="guard" x="-246" y="-331">V &gt;= v_max</label>
+		<label kind="assignment" x="-238" y="-314">t+=Tpoll,
+tUpd=0,
+V=v_max</label>
+		<nail x="-161" y="-348"/>
+	</transition>
+	<transition>
+		<source ref="id104"/>
+		<target ref="id106"/>
+		<label kind="guard" x="-620" y="-391">active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-578" y="-374">start_r_action?</label>
+		<label kind="assignment" x="-603" y="-348">t=0, tUpd=0,
+plan_traj(),
+active_robot[id-1] = false</label>
+	</transition>
+	<transition>
+		<source ref="id108"/>
+		<target ref="id104"/>
+		<label kind="assignment" x="-621" y="-484">initRobot()</label>
+	</transition>
+</template>

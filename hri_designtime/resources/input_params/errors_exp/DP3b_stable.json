@@ -1,0 +1,21 @@
+{
+	"global_params": [
+			{ "behavioral_model" : "errors"}],
+	"queries": [
+			{ "type": "pscs", "tau": 600, "n": -1 }],
+	"humans": [
+			{ "name": "P1", "h_id": 1, "v": 26.0, "ptrn": "FOLLOWER", "p_f": "y/s", "p_fw": "stable", "start": [220.0, 300.0], "dest": [4300.0, 300.0], "dext": 1, "same_as": -1, "path": -1 },
+			{ "name": "D1", "h_id": 2, "v": 100.0, "ptrn": "COMPETITOR", "p_f": "e/h", "p_fw": "n", "start": [260.0, 300.0], "dest": [4000.0, 300.0], "dext": 1, "same_as": -1, "path": -1 },
+			{ "name": "D2", "h_id": 3, "v": 50.0, "ptrn": "LEADER", "p_f": "e/h", "p_fw": "n", "start": [2000.0, 300.0], "dest": [4000.0, 300.0], "dext": 10, "same_as": -1, "path": -1 },
+			{ "name": "D2_1", "h_id": 4, "v": 50.0, "ptrn": "LEADER", "p_f": "e/h", "p_fw": "n", "start": [4000.0, 300.0], "dest": [2000.0, 300.0], "dext": 10, "same_as": 3, "path": -1 },
+			{ "name": "P1_1", "h_id": 5, "v": 26.0, "ptrn": "FOLLOWER", "p_f": "y/s", "p_fw": "stable", "start": [4300.0, 300.0], "dest": [2000.0, 300.0], "dext": 1, "same_as": 1, "path": -1 },
+			{ "name": "D2_2", "h_id": 6, "v": 50.0, "ptrn": "ASSISTANT", "p_f": "e/h", "p_fw": "n", "start": [2000.0, 300.0], "dest": [2000.0, 300.0], "dext": 10, "same_as": 3, "path": -1 }],
+	"robots": [
+			{ "name": "Tbot", "r_id": 1, "v": 26.0, "a": 26.0, "start": [300.0, 300.0], "chg": 12.07 }],
+	"areas": [
+			{ "p1": [200.0, 200.0], "p2": [4400.0, 200.0], "p3": [4400.0, 400.0], "p4": [200.0, 400.0] },
+			{ "p1": [4200.0, 0.0], "p2": [4400.0, 0.0], "p3": [4400.0, 600.0], "p4": [4200.0, 600.0] }],
+	"intersect": [
+			{ "p": [4300.0, 300.0] }], 
+	"max_neigh": 1
+}

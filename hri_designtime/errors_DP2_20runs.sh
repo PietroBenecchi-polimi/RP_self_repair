@@ -1,0 +1,16 @@
+python3 src/main.py DP2_crit_20runs
+python3 src/main.py DP2_stable_20runs
+python3 src/main.py DP2_inatt_20runs
+python3 src/main.py DP2_foc_20runs
+python3 src/main.py DP2_busy_20runs
+python3 src/main.py DP2_ava_20runs
+python3 src/main.py DP2_inex_20runs
+python3 src/main.py DP2_exp_20runs
+python3 src/main.py DP2_crit2_20runs
+python3 src/main.py DP2_stable2_20runs
+python3 src/main.py DP2_inatt2_20runs
+python3 src/main.py DP2_foc2_20runs
+python3 src/main.py DP2_busy2_20runs
+python3 src/main.py DP2_ava2_20runs
+python3 src/main.py DP2_inex2_20runs
+python3 src/main.py DP2_exp2_20runs

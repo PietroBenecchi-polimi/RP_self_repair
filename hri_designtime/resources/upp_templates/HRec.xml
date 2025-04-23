@@ -1,0 +1,547 @@
+	<template>
+		<name>Human_Recipient</name>
+		<parameter>int id, double _v, int p_f, int p_fw, int path</parameter>
+		<declaration>clock t, F;
+clock tUpd;
+clock tExp;
+
+double Fp;
+double lambda, mi;
+const double passout_th = 1.0;
+
+// Errors Model
+int obey, disobey;
+double freeWillTh;
+double fw;
+int TE;
+double lambda_crit;
+double hs, crit, non_crit;
+
+meta int v;
+
+bool access() {
+    return true;
+}
+
+void updateF(double coeff, bool walking) {
+    if(walking) {
+        internalFatigue[id-1] = 1-(1-internalFatigue[id-1])*exp(coeff*Tpoll);
+    } else {
+        internalFatigue[id-1] = internalFatigue[id-1]*exp(coeff*Tpoll);
+    }
+
+    internalFatigue[id-1] = fmax(0, internalFatigue[id-1]);
+}
+
+trajectory traj = **N_P_0.0**
+double ort = 0.0;
+int curr_traj = 0;
+
+void change_orientation(double sx, double sy, double dx, double dy) {
+    double cos_alpha, alpha, theta, delta;
+    double AC, AB;
+    bool turnLeft, needsTurning = false;
+
+    AC = pt_dist(sx, dx, sy, sy);
+    AB = pt_dist(sx, dx, sy, dy);
+
+    if (AB == 0)
+    {
+        return;
+    }
+
+    cos_alpha = AC / AB;
+    // angle between destination and hor. line
+    alpha = acos(cos_alpha);
+    // angle between robot axis and hor. line
+    theta = ort * 180 / PI;
+    // how much the robot should rotate [deg]
+    delta = 0.0;
+    turnLeft = false;
+
+    if (dx &gt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 1st quadrant
+        alpha = alpha * (180 / PI);
+        if (alpha &gt; theta)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &gt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 2nd quadrant
+        alpha = -alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 3rd quadrant
+        alpha = -(180 - alpha * (180 / PI));
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 4th quadrant
+        alpha = 180 - alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+
+    needsTurning = delta &gt; 0.0;
+
+    if (needsTurning &amp;&amp; turnLeft)
+    {
+        ort = ort * 180 / PI + delta;
+    }
+    else if (needsTurning &amp;&amp; !turnLeft)
+    {
+        ort = ort * 180 / PI - delta;
+    }
+}
+
+point curr, dest;
+
+void plan_traj() {
+    int i, j, next_inters = -1;
+    int neigh[**max_neigh**] = **max_neigh_-1**
+    int k = 0;
+    double dist, min_dist;
+    bool visited[N_I] = **N_I_false**
+            curr[0] = internalHumX[id-1]; curr[1] = internalHumY[id-1];
+    dest[0] = destX[id-1]; dest[1] = destY[id-1];
+    // init trajectory
+    for (i = 0; i &lt; N_P; i++)
+    {
+        traj[i][0] = 0.0;
+        traj[i][1] = 0.0;
+    }
+    i = 0;
+    curr_traj = 0;
+
+    // builds trajectory by finding a path among adjacent areas
+    // (the existence of an intersection point means two areas are adjacent to each other)
+    // until the destination area is reached
+    while (!same_area(curr[0], curr[1], dest[0], dest[1]))
+    {
+        for (j = 0; j &lt; N_I; j++)
+        {
+            // find all int. pts which are a neighbor of curr. point
+            // there are max. 3 in the long left hall
+            if (same_area(curr[0], curr[1], INTERSECTIONS[j][0], INTERSECTIONS[j][1]) &amp;&amp; !visited[j])
+            {
+                neigh[k] = j;
+                k++;
+            }
+        }
+        // next int. point to add to traj. is the closest to destination
+        min_dist = pt_dist(INTERSECTIONS[neigh[0]][0], dest[0], INTERSECTIONS[neigh[0]][1], dest[1]);
+        next_inters = neigh[0];
+        for (j = 1; j &lt; **max_neigh** &amp;&amp; neigh[j] != -1; j++)
+        {
+            dist = pt_dist(INTERSECTIONS[neigh[j]][0], dest[0], INTERSECTIONS[neigh[j]][1], dest[1]);
+            if (dist &lt; min_dist)
+            {
+                min_dist = dist;
+                next_inters = neigh[j];
+            }
+        }
+        // if trajectory is full, or no next point has been found,
+        // something has gone wrong, but I cannot raise an exception
+        if (i == N_P - 1 || next_inters == -1)
+            return;
+        // next inters point is set as visited,
+        visited[next_inters] = true;
+        // added to the trajectory,
+        traj[i][0] = INTERSECTIONS[next_inters][0];
+        traj[i][1] = INTERSECTIONS[next_inters][1];
+        i++;
+        // and set as current point
+        curr[0] = INTERSECTIONS[next_inters][0];
+        curr[1] = INTERSECTIONS[next_inters][1];
+        // reset
+        next_inters = -1;
+        k = 0;
+        for(j=0; j&lt;**max_neigh**;j++) neigh[j] = -1;
+    }
+    // destination point is always part of the trajectory
+    traj[i][0] = dest[0];
+    traj[i][1] = dest[1];
+
+    //sets initial orientation
+    change_orientation(internalHumX[id-1], internalHumY[id-1], traj[0][0], traj[0][1]);
+}
+
+void start_moving() {
+    F = 0;
+    t = 0;
+    tUpd=0;
+    hExe = 1;
+    plan_traj();
+}
+
+double dist_to_dest;
+void updateP() {
+    double eps = 0.0;
+
+    if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+    return;
+
+    if (pt_dist(internalHumX[id-1], traj[curr_traj][0], internalHumY[id-1], traj[curr_traj][1]) &lt; 20.0) {
+        curr_traj++;
+        if (curr_traj &gt;= N_P)
+        return;
+        change_orientation(internalHumX[id-1], internalHumY[id-1], traj[curr_traj][0], traj[curr_traj][1]);
+    }
+
+    internalHumX[id-1] = internalHumX[id-1] + v*Tpoll*cos(ort*PI/180);
+    internalHumY[id-1] = internalHumY[id-1] + v*Tpoll*sin(ort*PI/180);
+}
+
+void initHuman() {
+    double dist_to_dest = pt_dist(startX[id-1], destX[id-1], startY[id-1], destY[id-1]);
+    ERR_PROF error_profile;
+
+    F = 0;
+    Fp = 0;
+    t = 0;
+    v = fint(_v);
+
+    tUpd = 0;
+    if(path==ND) {
+        humanPositionX[id - 1] = startX[id-1];
+        humanPositionY[id - 1] = startY[id-1];
+    } else if(path==1) {
+        humanPositionX[id - 1] = startX_alt1[id-1];
+        humanPositionY[id - 1] = startY_alt1[id-1];
+    } else {
+        humanPositionX[id - 1] = startX_alt2[id-1];
+        humanPositionY[id - 1] = startY_alt2[id-1];
+    }
+
+    internalHumX[id-1] = humanPositionX[id-1];
+    internalHumY[id-1] = humanPositionY[id-1];
+
+    if(p_f==1) {
+        lambda = YOUNG_HEALTHY[0]; mi = YOUNG_HEALTHY[1];
+    } else if(p_f==2) {
+        lambda = random_normal(YOUNG_SICK[0], YOUNG_SICK_SIGMA[0]);
+        mi = random_normal(YOUNG_SICK[1], YOUNG_SICK_SIGMA[1]);
+    } else if(p_f==3) {
+        lambda = random_normal(ELDERLY_HEALTHY[0], ELDERLY_HEALTHY_SIGMA[0]);
+        mi = random_normal(ELDERLY_HEALTHY[1], ELDERLY_HEALTHY_SIGMA[1]);
+    } else if(p_f==4) {
+        lambda = ELDERLY_SICK[0]; mi = ELDERLY_SICK[1];
+    } else if (p_f == 5)
+    {
+        lambda = YOUNG_UNSTEADY[0];
+        mi = YOUNG_UNSTEADY[1];
+    }
+    else if (p_f == 6)
+    {
+        lambda = ELDERLY_UNSTEADY[0];
+        mi = ELDERLY_UNSTEADY[1];
+    } else {
+        lambda = 0.005; mi = 0.005; //default values
+    }
+
+    error_profile = get_error_params(p_fw);
+    obey = error_profile.obey;
+    disobey = error_profile.disobey;
+    freeWillTh = error_profile.FW_th;
+    TE = fint(dist_to_dest / v * (error_profile.delta_x100/100));
+    lambda_crit = 1/error_profile.lambda_inv;
+    hs = error_profile.crit;
+    crit = 1.0;
+    non_crit = 999.0;
+}
+    </declaration>
+		<location id="id69" x="-492" y="-399">
+			<name x="-526" y="-425">idle</name>
+			<label kind="invariant" x="-578" y="-459">F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id70" x="119" y="-399">
+			<name x="127" y="-442">busy_mov</name>
+			<label kind="invariant" x="127" y="-493">F &lt;= passout_th
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id71" x="-687" y="-398">
+			<name x="-730" y="-415">Init</name>
+			<committed/>
+		</location>
+		<location id="id72" x="272" y="-399" color="#ff0000">
+			<name x="289" y="-416">passed_out</name>
+			<label kind="invariant" x="289" y="-399">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="264" y="-382">1</label>
+		</location>
+		<location id="id73" x="-195" y="-569">
+			<name x="-187" y="-561">busy_rec</name>
+			<label kind="invariant" x="-187" y="-544">F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id74" x="-493" y="-246">
+			<name x="-476" y="-238">pub_1</name>
+			<committed/>
+		</location>
+		<location id="id75" x="-578" y="-246">
+			<name x="-638" y="-254">pub_2</name>
+			<committed/>
+		</location>
+		<location id="id76" x="119" y="-246">
+			<name x="102" y="-229">pub_5</name>
+			<committed/>
+		</location>
+		<location id="id77" x="119" y="-323">
+			<name x="59" y="-331">pub_6</name>
+			<committed/>
+		</location>
+		<location id="id78" x="-85" y="-714">
+			<name x="-95" y="-748">pub_4</name>
+			<committed/>
+		</location>
+		<location id="id79" x="-195" y="-714">
+			<name x="-205" y="-748">pub_3</name>
+			<committed/>
+		</location>
+		<location id="id80" x="-493" y="-688">
+			<name x="-476" y="-705">timeout_detection</name>
+			<committed/>
+		</location>
+		<location id="id81" x="-629" y="-688" color="#ff0000">
+			<name x="-639" y="-722">timer_expired_status</name>
+			<label kind="invariant" x="-637" y="-773">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="-646" y="-671">1</label>
+		</location>
+		<location id="id82" x="119" y="-569">
+			<committed/>
+		</location>
+		<location id="id83" x="119" y="-731" color="#ff0000">
+			<name x="145" y="-740">forbidden_area_status</name>
+			<label kind="invariant" x="144" y="-807">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="119" y="-783">1</label>
+		</location>
+		<init ref="id71"/>
+		<transition>
+			<source ref="id82"/>
+			<target ref="id83"/>
+			<label kind="guard" x="127" y="-671">!access()</label>
+			<label kind="synchronisation" x="127" y="-688">h_fail!</label>
+			<label kind="assignment" x="127" y="-654">tExp = 0</label>
+		</transition>
+		<transition>
+			<source ref="id82"/>
+			<target ref="id73"/>
+			<label kind="guard" x="-17" y="-595">access()</label>
+		</transition>
+		<transition>
+			<source ref="id70"/>
+			<target ref="id82"/>
+			<label kind="synchronisation" x="25" y="-501">start_h_action?</label>
+			<label kind="assignment" x="25" y="-552">t = 0, Fp = F,
+fw = 0, tUpd=0,
+tExp=0</label>
+		</transition>
+		<transition>
+			<source ref="id81"/>
+			<target ref="id81"/>
+			<nail x="-663" y="-714"/>
+			<nail x="-663" y="-671"/>
+		</transition>
+		<transition>
+			<source ref="id80"/>
+			<target ref="id81"/>
+			<label kind="synchronisation" x="-578" y="-705">h_fail!</label>
+			<label kind="assignment" x="-595" y="-688">tExp = 0</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id70"/>
+			<target ref="id80"/>
+			<label kind="guard" x="-127" y="-467">tExp &gt;= TE
+&amp;&amp; !served[id-1]</label>
+			<nail x="17" y="-399"/>
+			<nail x="17" y="-450"/>
+			<nail x="-212" y="-450"/>
+			<nail x="-212" y="-527"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id73"/>
+			<target ref="id80"/>
+			<label kind="guard" x="-475" y="-662">tExp &gt;= TE &amp;&amp;
+!served[id-1]</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id69"/>
+			<target ref="id80"/>
+			<label kind="guard" x="-629" y="-637">tExp &gt;= TE
+&amp;&amp; !served[id-1]</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id74"/>
+			<target ref="id70"/>
+			<label kind="guard" x="-178" y="-433">currH==id &amp;&amp;
+fw&gt;=freeWillTh</label>
+			<label kind="assignment" x="-178" y="-399">t = 0, Fp = 1-F,
+tUpd=0, fw = 0,
+plan_traj(), tExp=0</label>
+			<nail x="-187" y="-246"/>
+			<nail x="-187" y="-399"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id76"/>
+			<target ref="id69"/>
+			<label kind="guard" x="-178" y="-263">fw&gt;=freeWillTh</label>
+			<label kind="assignment" x="-178" y="-246">t = 0, Fp = F, fw = 0</label>
+			<nail x="-229" y="-246"/>
+			<nail x="-229" y="-399"/>
+		</transition>
+		<transition>
+			<source ref="id78"/>
+			<target ref="id73"/>
+			<label kind="synchronisation" x="-136" y="-663">publish_m[3]!</label>
+			<label kind="assignment" x="-136" y="-646">tUpd=0</label>
+			<nail x="-85" y="-569"/>
+		</transition>
+		<transition>
+			<source ref="id79"/>
+			<target ref="id78"/>
+			<label kind="guard" x="-178" y="-714">currH==id</label>
+			<label kind="synchronisation" x="-187" y="-697">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id73"/>
+			<target ref="id79"/>
+			<label kind="guard" x="-289" y="-663">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="-289" y="-646">updateF(-mi, 0),
+tUpd=0</label>
+		</transition>
+		<transition>
+			<source ref="id77"/>
+			<target ref="id70"/>
+			<label kind="synchronisation" x="17" y="-357">publish_m[3]!</label>
+			<label kind="assignment" x="59" y="-374">tUpd=0</label>
+		</transition>
+		<transition>
+			<source ref="id76"/>
+			<target ref="id77"/>
+			<label kind="guard" x="17" y="-306">fw&lt;freeWillTh</label>
+			<label kind="synchronisation" x="17" y="-272">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id70"/>
+			<target ref="id76"/>
+			<label kind="guard" x="204" y="-314">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="204" y="-297">updateF(-lambda, 1),
+updateP(), tUpd=0,
+fw = random(FW_max)</label>
+			<nail x="195" y="-399"/>
+			<nail x="195" y="-246"/>
+		</transition>
+		<transition>
+			<source ref="id75"/>
+			<target ref="id69"/>
+			<label kind="synchronisation" x="-671" y="-331">publish_m[3]!</label>
+			<label kind="assignment" x="-671" y="-314">tUpd=0</label>
+			<nail x="-578" y="-399"/>
+		</transition>
+		<transition>
+			<source ref="id74"/>
+			<target ref="id75"/>
+			<label kind="guard" x="-561" y="-289">currH==id &amp;&amp;
+fw&lt;freeWillTh</label>
+			<label kind="synchronisation" x="-561" y="-306">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id74"/>
+			<target ref="id69"/>
+			<label kind="guard" x="-544" y="-365">currH!=id</label>
+			<label kind="assignment" x="-544" y="-348">tExp=0</label>
+		</transition>
+		<transition>
+			<source ref="id69"/>
+			<target ref="id74"/>
+			<label kind="guard" x="-399" y="-357">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="-399" y="-340">updateF(-mi, 0), tUpd=0,
+fw = random(FW_max)</label>
+			<nail x="-408" y="-399"/>
+			<nail x="-408" y="-246"/>
+		</transition>
+		<transition>
+			<source ref="id73"/>
+			<target ref="id69"/>
+			<label kind="synchronisation" x="-459" y="-552">stop_h_action?</label>
+			<label kind="assignment" x="-459" y="-603">t = 0, Fp = F,
+fw = 0,
+tUpd=0</label>
+			<nail x="-467" y="-569"/>
+		</transition>
+		<transition>
+			<source ref="id69"/>
+			<target ref="id73"/>
+			<label kind="guard" x="-357" y="-518">currH==id</label>
+			<label kind="synchronisation" x="-357" y="-501">start_h_action?</label>
+			<label kind="assignment" x="-357" y="-484">F = 0, t = 0,
+tUpd=0</label>
+			<nail x="-365" y="-399"/>
+			<nail x="-365" y="-518"/>
+		</transition>
+		<transition>
+			<source ref="id70"/>
+			<target ref="id72"/>
+			<label kind="guard" x="137" y="-416">F &gt;= passout_th</label>
+			<label kind="synchronisation" x="204" y="-399">h_fail!</label>
+			<label kind="assignment" x="213" y="-382">t = 0</label>
+		</transition>
+		<transition>
+			<source ref="id72"/>
+			<target ref="id72"/>
+			<nail x="247" y="-348"/>
+			<nail x="289" y="-348"/>
+		</transition>
+		<transition>
+			<source ref="id71"/>
+			<target ref="id69"/>
+			<label kind="assignment" x="-671" y="-416">initHuman()</label>
+		</transition>
+		<transition>
+			<source ref="id83"/>
+			<target ref="id83"/>
+			<nail x="145" y="-791"/>
+			<nail x="102" y="-791"/>
+		</transition>
+	</template>

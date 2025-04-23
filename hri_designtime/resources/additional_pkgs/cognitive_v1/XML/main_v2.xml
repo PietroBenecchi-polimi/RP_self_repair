@@ -1,0 +1,1031 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+	<declaration>// Place global declarations here.
+// Human Channels
+broadcast chan start_h_action, stop_h_action, h_fail;
+
+// Robot Channels
+broadcast chan start_r_action, stop_r_action, r_still;
+
+// Battery Channels
+broadcast chan start_recharging[int], stop_recharging, dead_battery;
+
+// Orchestrator Channels
+broadcast chan opchk_start, opchk_stop, opchk_scs, opchk_fail;
+broadcast chan publish_m[int];
+
+/**
+*** CONSTANTS
+**/
+const double PI = 3.1415926535;
+const double INT16_MAX = 32767.0;
+
+
+// Human Fatigue Profiles [fatiguing rate, recovery rate]
+// MET = ln(1-epsilon)/(-lambda)
+const double YOUNG_HEALTHY[2] = {0.0005, 0.0005}; // approx. 1380s
+
+// Pre-Simulation
+
+const double YOUNG_SICK[2] = {0.001865, 0.005117};
+const double YOUNG_SICK_SIGMA[2] = {0.000719, 0.000001};
+
+const double ELDERLY_HEALTHY[2] = {0.000409, 0.000450};
+const double ELDERLY_HEALTHY_SIGMA[2] = {0.000091, 0.000119};
+
+// Post-Simulation
+/*
+const double YOUNG_SICK[2] = {0.004538, 0.003328};
+const double YOUNG_SICK_SIGMA[2] = {0.000469, 0.001342};
+
+const double ELDERLY_HEALTHY[2] = {0.000553, 0.000302};
+const double ELDERLY_HEALTHY_SIGMA[2] = {0.004548, 0.000175};
+*/
+
+//
+const double ELDERLY_SICK[2] = {0.005, 0.004}; // approx. 350s
+const double YOUNG_UNSTEADY[2] = {0.025, 0.001}; // approx. 280s
+const double ELDERLY_UNSTEADY[2] = {0.035, 0.001};
+
+const int F_max = 1;
+
+/**
+** ERRORS PARAMS
+**/
+const int Tpoll = 1;
+
+const int H1_ERR = 0;
+const int H2_ERR = 0;
+const int H3_ERR = 7;
+const int H4_ERR = 0;
+
+// obey/disobey
+const int DISABLED_WEIGHTS[2] = {100, 0};
+const int HIGH_WEIGHTS[2] = {90, 10};
+const int NORMAL_WEIGHTS[2] = {95, 5};
+const int LOW_WEIGHTS[2] = {99, 1};
+
+// free will
+const int FW_max = 100;
+const int DISABLED_FW = 101;
+const int NORMAL_FW = 99;
+const int HIGH_FW = 95;
+const int LOW_FW = 100;
+
+// timer expired
+const int DISABLED_DELTA = 9999;
+const int HIGH_DELTA = 200;
+const int NORMAL_DELTA = 400;
+const int LOW_DELTA = 800;
+
+// safety distance
+bool is_crit = false;
+bool ignore_crit = false;
+int collisions = 0;
+
+const int DISABLED_LAMBDA = 9999;
+const int HIGH_LAMBDA = 1;
+const int NORMAL_LAMBDA = 10;
+const int LOW_LAMBDA = 10000;
+
+// critical status
+const int FS = 1000;
+const int DISABLED_CRIT = 0;
+const int HIGH_CRIT = 2;
+const int NORMAL_CRIT = 1;
+const int LOW_CRIT = 0;
+
+typedef struct {
+    int obey, disobey;
+    int FW_th;
+    int delta_x100;
+    int lambda_inv;
+    int crit;
+} ERR_PROF;
+
+ERR_PROF get_error_params(int p) {
+    ERR_PROF res = {LOW_WEIGHTS[0], LOW_WEIGHTS[1], LOW_FW, LOW_DELTA, LOW_LAMBDA, LOW_CRIT};
+
+    if(p==1) { // busy professional
+        res.FW_th = HIGH_FW;
+        res.delta_x100 = HIGH_DELTA;
+    }
+    else if(p==2) { // free professional
+        res.FW_th = LOW_FW;
+        res.delta_x100 = LOW_DELTA;
+    }
+    else if(p==3) { // unexperienced professional
+        res.lambda_inv = HIGH_LAMBDA;
+    }
+    else if(p==4) { // experienced professional
+        res.lambda_inv = LOW_LAMBDA;
+    }
+    else if(p==5) { // critical patient
+        res.crit = HIGH_CRIT;
+    }
+    else if(p==6) { // stable patient
+        res.crit = NORMAL_CRIT;
+    }
+    else if(p==7) { // distracted patient
+        res.obey = HIGH_WEIGHTS[0];
+        res.disobey = HIGH_WEIGHTS[1];
+        res.FW_th = HIGH_FW;
+    }
+    else if(p==8) { // focused patient
+        res.FW_th = LOW_FW;
+        res.obey = LOW_WEIGHTS[0];
+        res.disobey = LOW_WEIGHTS[1];
+    }
+    else {
+        res.FW_th = DISABLED_FW;
+        res.obey = DISABLED_WEIGHTS[0];
+        res.disobey = DISABLED_WEIGHTS[1];
+        res.delta_x100 = DISABLED_DELTA;
+        res.lambda_inv = DISABLED_LAMBDA;
+        res.crit = DISABLED_CRIT;
+    }
+
+    return res;
+}
+
+/**
+*** VARIABLES
+**/
+
+// Mission Mgmt
+const int R = **N_R**
+int currOp[R] = **N_R_1**
+double dX[R], dY[R];
+
+bool stop[R] = **N_R_false**
+bool startHuman = false;
+bool stopHuman = false;
+bool exeRobot = false;
+bool fail = false;
+bool scs = false;
+//
+const int MAX_BUFF_SIZE = 10;
+
+// Robot Mgmt
+bool active_robot[R] = **N_R_act**
+int currR = 1; //current robot
+int coR = -1;  //co-robot
+bool synch = false;    //used to check if the syncrhonization between the two robots has happened (task handover pattern)
+/*
+** Added for multi-robot TESTING
+*/
+bool busy[R] = **N_R_false**
+
+// Human Mgmt
+int currH = 1;
+int hExe = 0;
+
+// Sensor Outputs
+double batteryCharge[R] = **N_R_100.0**
+double internal_charge[R] = **N_R_-1**
+
+double robPositionX[R];
+double robPositionY[R];
+double internalRobX[R], internalRobY[R];
+
+/**
+* MISSION DEFINITION
+**/
+
+// -&gt; HOW MANY HUMANS TO SERVE IN THE MISSION
+const int H = **N_H**
+
+bool served[H] = **N_H_false**
+bool objectTaken[H] = **N_H_false**
+double humanFatigue[H] = **N_H_0.0**
+double humanPositionX[H] = **N_H_0.0**
+double humanPositionY[H] = **N_H_0.0**
+double humTheta[H] = **N_H_0.0**
+
+double internalFatigue[H] = **N_H_0.0**
+double internalHumX[H] = **N_H_0.0**
+double internalHumY[H] = **N_H_0.0**
+
+const int ND = -1;
+const double NDD = -1.0;
+int PATH = 0;
+
+int SAME_H_IDs[H][H] = **SAME_IDs_MAT**
+
+// -&gt; DEFINE PATTERN SEQUENCE (make sure it is consistent with humans ids)
+// 0: human follower, 1: human leader, 2: human recipient, 3: human applicant,
+// 10: human_rescuer, (11: human_interdependence_mission,) 12: human competitor
+int patterns[H] = **PTRNS**
+int patterns_alt1[H] = **PTRNS**
+int patterns_alt2[H] = **PTRNS**
+//
+
+// -&gt; DEFINE STARTING LOCATIONS IN CARTESIAN PLAN
+double startX[H] = **START_X**
+double startY[H] = **START_Y**
+
+double startX_alt1[H] = **START_X**
+double startY_alt1[H] = **START_Y**
+double startX_alt2[H] = **START_X**
+double startY_alt2[H] = **START_Y**
+
+// -&gt; DEFINE DESTINATIONS IN CARTESIAN PLAN
+// the definition of destination can vary depending on the pattern,
+// and you can decide what it corresponds to for your specific pattern
+double destX[H] = **DEST_X**
+double destY[H] = **DEST_Y**
+
+double destX_alt1[H] = **DEST_X**
+double destY_alt1[H] = **DEST_Y**
+double destX_alt2[H] = **DEST_X**
+double destY_alt2[H] = **DEST_Y**
+
+/**
+* PARAMS FOR RESCUER AND APPLICANT (task size and dexterity)
+**/
+
+const int task_size = 150;
+int dext = 1;
+int task_completion = 0;
+
+/**
+*** FLOOR PLAN
+**/
+const int N_A = **N_A**
+const int N_P = **N_P**
+const int N_I = **N_I**
+
+typedef double point[2];
+typedef point area[4];
+typedef area layout[N_A];
+typedef point trajectory[N_P];
+
+const layout FLOOR = **LAYOUT**
+const point INTERSECTIONS[N_I] = **INTERSECTIONS**
+
+// I apologize for the four doubles,
+// but it seems to be bugging when arrays are passed as arguments.
+bool same_area(double sx, double sy, double dx, double dy) {
+    int i;
+    bool x_s_in, y_s_in, x_d_in, y_d_in;
+    for (i = 0; i &lt; N_A; i++)
+    {
+        x_s_in = sx &gt; FLOOR[i][0][0] &amp;&amp; sx &lt; FLOOR[i][3][0];
+        y_s_in = sy &gt; FLOOR[i][0][1] &amp;&amp; sy &lt; FLOOR[i][1][1];
+        x_d_in = dx &gt; FLOOR[i][0][0] &amp;&amp; dx &lt; FLOOR[i][3][0];
+        y_d_in = dy &gt; FLOOR[i][0][1] &amp;&amp; dy &lt; FLOOR[i][1][1];
+        if ((x_s_in &amp;&amp; y_s_in) &amp;&amp; (x_d_in &amp;&amp; y_d_in)) // start and dest in same area
+            return true;
+    }
+    return false;
+}
+
+// same.
+double pt_dist(double x1, double x2, double y1, double y2) {
+    double xdifference = x2-x1;
+    double ydifference = y2-y1;
+    return sqrt((xdifference*xdifference)+(ydifference*ydifference));
+}
+
+double calculateDistance() {
+    double xdifference = pow(robPositionX[currR-1]-humanPositionX[currH-1], 2);
+    double ydifference = pow(robPositionY[currR-1]-humanPositionY[currH-1], 2);
+    double distance = sqrt(xdifference + ydifference)/100;
+
+    if(distance&lt;0) return -distance;
+    else return distance;
+}
+
+// Wall Corner Points
+const point rechargeStation = {220.0, 320.00};
+
+/////// static globalDec ///////
+const int nc_seeao=5;
+const int n_arg_all=22;
+const int n_sense_tot=5;
+const int nc_obj=3;
+const int nr_argAd=7;
+
+/////// max globalDec ///////
+const int nr_seeao_max = 57;
+const int nr_impEntity_max = 11;
+const int nr_impSense_max = 5;
+const int nr_obj_max = 7;
+</declaration>
+**HUMAN_APPLICANT**
+**HUMAN_COMPETITOR**
+**HUMAN_FOLLOWER**
+**HUMAN_LEADER**
+**HUMAN_RECIPIENT**
+**HUMAN_RESCUER**
+**ROBOT**
+**BATTERY**
+**ORCHESTRATOR**
+**OPCHK**
+**ROS**
+<system>
+/////// HF_1 ///////
+//args  HF_1
+//vecArg
+const double arg_us_HF_1[n_arg_all] = {
+50.0,//upd_weight_ref [0]
+0.0,//caso_upd_weight_ref [1]
+1.0,//stm_weight_ref [2]
+2.0,//ltm_weight_ref [3]
+1.0,//caso_weight_entity_ref [4]
+1.0,//caso_weight_sense_ref [5]
+2.0,//caso_event_ref [6]
+1.0,//caso_deelay_ref [7]
+1.0,//n_deelay_index_ref [8]
+1.0,//last_id_extracted_output_ref [9]
+2.0,//caso_last_id_ref [10]
+0.0,//caso_obj_ref [11]
+0.0,//obj_selected_ref [12]
+400.0,//distance_threshold_ref [13]
+3.0,//caso_stm_ltm_ref [14]
+10.0,//n_stm_ref [15]
+6.0,//n_ltm_ref [16]
+1.0,//id_robot [17]
+1.0,//id_walk [18]
+2.0,//id_sit [19]
+3.0,//id_run [20]
+4.0//id_stand [21]
+};
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+//args_ad  HF_1
+const int arg_ad_HF_1[nr_argAd]={
+35,//nr_seeao
+1,//n_sense
+11,//n_entity
+11,//n_event
+20,//n_action
+4,//n_output
+7//nr_obj
+};
+////////////////////////////////////////////////
+//matrix seeao num HF_1
+const int SEEAO_HF_1[nr_seeao_max][nc_seeao]={
+{1,1,1,1,1},
+{1,1,1,2,4},
+{1,1,1,3,2},
+{1,1,1,5,4},
+{1,1,1,4,1},
+{1,2,2,1,1},
+{1,2,2,2,4},
+{1,2,2,3,2},
+{1,2,2,5,4},
+{1,3,3,1,1},
+{1,3,3,2,4},
+{1,3,3,3,2},
+{1,3,3,5,4},
+{1,4,4,1,1},
+{1,4,4,6,2},
+{1,4,4,3,4},
+{1,5,5,1,1},
+{1,6,6,7,1},
+{1,6,6,15,4},
+{1,6,6,8,1},
+{1,6,6,9,4},
+{1,7,7,10,4},
+{1,7,7,11,1},
+{1,7,7,12,4},
+{1,8,8,7,1},
+{1,8,8,15,4},
+{1,8,8,8,3},
+{1,8,8,9,4},
+{1,9,9,10,4},
+{1,9,9,11,1},
+{1,9,9,12,4},
+{1,10,10,13,3},
+{1,10,10,14,4},
+{1,11,11,19,4},
+{1,11,11,20,1},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0}
+};
+////////////////////////////////////////////////
+//matrix_obj_xye_num HF_1
+const double obj_xye_HF_1[nr_obj_max][nc_obj] = {
+{400.0,270.0,2.0},
+{4000.0,270.0,2.0},
+{1400.0,450.00,5.0},
+{1200.0,680.0,2.0},
+{3000.0,450.0,5.0},
+{200.0,200.0,3.0},
+{4000.0,700.0,3.0}
+};
+////////////////////////////////////////////////
+//importance_matrix_num HF_1
+//sense importance matrix
+const double importance_sense_HF_1[nr_impSense_max] = {
+10.0,
+10.0,
+10.0,
+0.0,
+0.0
+};
+//entity importance matrix
+const double importance_entity_HF_1[nr_impEntity_max] = {
+10.0,
+10.0,
+10.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0
+};
+////////////////////////////////////////////////
+/////// HL_2 ///////
+//args  HL_2
+//vecArg
+const double arg_us_HL_2[n_arg_all] = {
+50.0,//upd_weight_ref [0]
+0.0,//caso_upd_weight_ref [1]
+1.0,//stm_weight_ref [2]
+2.0,//ltm_weight_ref [3]
+1.0,//caso_weight_entity_ref [4]
+1.0,//caso_weight_sense_ref [5]
+2.0,//caso_event_ref [6]
+1.0,//caso_deelay_ref [7]
+1.0,//n_deelay_index_ref [8]
+1.0,//last_id_extracted_output_ref [9]
+2.0,//caso_last_id_ref [10]
+0.0,//caso_obj_ref [11]
+0.0,//obj_selected_ref [12]
+400.0,//distance_threshold_ref [13]
+3.0,//caso_stm_ltm_ref [14]
+10.0,//n_stm_ref [15]
+6.0,//n_ltm_ref [16]
+1.0,//id_robot [17]
+1.0,//id_walk [18]
+2.0,//id_sit [19]
+3.0,//id_run [20]
+4.0//id_stand [21]
+};
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+//args_ad  HL_2
+const int arg_ad_HL_2[nr_argAd]={
+57,//nr_seeao
+3,//n_sense
+11,//n_entity
+18,//n_event
+20,//n_action
+4,//n_output
+7//nr_obj
+};
+////////////////////////////////////////////////
+//matrix seeao num HL_2
+const int SEEAO_HL_2[nr_seeao_max][nc_seeao]={
+{1,1,1,1,1},
+{1,1,1,2,4},
+{1,1,1,3,2},
+{1,1,1,5,4},
+{1,1,1,4,1},
+{1,2,2,1,1},
+{1,2,2,2,4},
+{1,2,2,3,2},
+{1,2,2,5,4},
+{1,3,3,1,1},
+{1,3,3,2,4},
+{1,3,3,3,2},
+{1,3,3,5,4},
+{1,4,4,1,1},
+{1,4,4,6,2},
+{1,4,4,3,4},
+{1,5,5,1,1},
+{1,6,6,7,1},
+{1,6,6,15,4},
+{1,6,6,8,1},
+{1,6,6,9,4},
+{1,7,7,10,4},
+{1,7,7,11,1},
+{1,7,7,12,4},
+{1,8,8,7,1},
+{1,8,8,15,4},
+{1,8,8,8,3},
+{1,8,8,9,4},
+{1,9,9,10,4},
+{1,9,9,11,1},
+{1,9,9,12,4},
+{1,10,10,13,3},
+{1,10,10,14,4},
+{1,11,11,19,4},
+{1,11,11,20,1},
+{2,1,12,1,1},
+{2,1,12,2,4},
+{2,1,12,3,4},
+{2,1,12,5,4},
+{2,1,12,4,1},
+{2,2,13,1,1},
+{2,2,13,2,4},
+{2,2,13,3,4},
+{2,2,13,5,2},
+{2,3,14,1,1},
+{2,3,14,2,4},
+{2,3,14,3,4},
+{2,3,14,5,4},
+{2,3,14,16,1},
+{2,4,15,1,1},
+{2,4,15,6,2},
+{2,4,15,3,4},
+{2,5,16,1,1},
+{3,10,17,13,3},
+{3,10,17,14,4},
+{3,11,18,18,4},
+{3,11,18,17,1}
+};
+////////////////////////////////////////////////
+//matrix_obj_xye_num HL_2
+const double obj_xye_HL_2[nr_obj_max][nc_obj] = {
+{400.0,270.0,2.0},
+{4000.0,270.0,2.0},
+{1400.0,450.00,5.0},
+{1200.0,680.0,2.0},
+{3000.0,450.0,5.0},
+{200.0,200.0,3.0},
+{4000.0,700.0,3.0}
+};
+////////////////////////////////////////////////
+//importance_matrix_num HL_2
+//sense importance matrix
+const double importance_sense_HL_2[nr_impSense_max] = {
+10.0,
+10.0,
+10.0,
+10.0,
+10.0
+};
+//entity importance matrix
+const double importance_entity_HL_2[nr_impEntity_max] = {
+10.0,
+10.0,
+10.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0
+};
+////////////////////////////////////////////////
+/////// HL_3 ///////
+//args  HL_3
+//vecArg
+const double arg_us_HL_3[n_arg_all] = {
+50.0,//upd_weight_ref [0]
+0.0,//caso_upd_weight_ref [1]
+1.0,//stm_weight_ref [2]
+2.0,//ltm_weight_ref [3]
+1.0,//caso_weight_entity_ref [4]
+1.0,//caso_weight_sense_ref [5]
+2.0,//caso_event_ref [6]
+1.0,//caso_deelay_ref [7]
+1.0,//n_deelay_index_ref [8]
+1.0,//last_id_extracted_output_ref [9]
+2.0,//caso_last_id_ref [10]
+0.0,//caso_obj_ref [11]
+0.0,//obj_selected_ref [12]
+400.0,//distance_threshold_ref [13]
+3.0,//caso_stm_ltm_ref [14]
+10.0,//n_stm_ref [15]
+6.0,//n_ltm_ref [16]
+1.0,//id_robot [17]
+1.0,//id_walk [18]
+2.0,//id_sit [19]
+3.0,//id_run [20]
+4.0//id_stand [21]
+};
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+//args_ad  HL_3
+const int arg_ad_HL_3[nr_argAd]={
+57,//nr_seeao
+3,//n_sense
+11,//n_entity
+18,//n_event
+20,//n_action
+4,//n_output
+7//nr_obj
+};
+////////////////////////////////////////////////
+//matrix seeao num HL_3
+const int SEEAO_HL_3[nr_seeao_max][nc_seeao]={
+{1,1,1,1,1},
+{1,1,1,2,4},
+{1,1,1,3,2},
+{1,1,1,5,4},
+{1,1,1,4,1},
+{1,2,2,1,1},
+{1,2,2,2,4},
+{1,2,2,3,2},
+{1,2,2,5,4},
+{1,3,3,1,1},
+{1,3,3,2,4},
+{1,3,3,3,2},
+{1,3,3,5,4},
+{1,4,4,1,1},
+{1,4,4,6,2},
+{1,4,4,3,4},
+{1,5,5,1,1},
+{1,6,6,7,1},
+{1,6,6,15,4},
+{1,6,6,8,1},
+{1,6,6,9,4},
+{1,7,7,10,4},
+{1,7,7,11,1},
+{1,7,7,12,4},
+{1,8,8,7,1},
+{1,8,8,15,4},
+{1,8,8,8,3},
+{1,8,8,9,4},
+{1,9,9,10,4},
+{1,9,9,11,1},
+{1,9,9,12,4},
+{1,10,10,13,3},
+{1,10,10,14,4},
+{1,11,11,19,4},
+{1,11,11,20,1},
+{2,1,12,1,1},
+{2,1,12,2,4},
+{2,1,12,3,4},
+{2,1,12,5,4},
+{2,1,12,4,1},
+{2,2,13,1,1},
+{2,2,13,2,4},
+{2,2,13,3,4},
+{2,2,13,5,2},
+{2,3,14,1,1},
+{2,3,14,2,4},
+{2,3,14,3,4},
+{2,3,14,5,4},
+{2,3,14,16,1},
+{2,4,15,1,1},
+{2,4,15,6,2},
+{2,4,15,3,4},
+{2,5,16,1,1},
+{3,10,17,13,3},
+{3,10,17,14,4},
+{3,11,18,18,4},
+{3,11,18,17,1}
+};
+////////////////////////////////////////////////
+//matrix_obj_xye_num HL_3
+const double obj_xye_HL_3[nr_obj_max][nc_obj] = {
+{400.0,270.0,2.0},
+{4000.0,270.0,2.0},
+{1400.0,450.00,5.0},
+{1200.0,680.0,2.0},
+{3000.0,450.0,5.0},
+{200.0,200.0,3.0},
+{4000.0,700.0,3.0}
+};
+////////////////////////////////////////////////
+//importance_matrix_num HL_3
+//sense importance matrix
+const double importance_sense_HL_3[nr_impSense_max] = {
+10.0,
+10.0,
+10.0,
+10.0,
+10.0
+};
+//entity importance matrix
+const double importance_entity_HL_3[nr_impEntity_max] = {
+10.0,
+10.0,
+10.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0
+};
+////////////////////////////////////////////////
+/////// HL_4 ///////
+//args  HL_4
+//vecArg
+const double arg_us_HL_4[n_arg_all] = {
+50.0,//upd_weight_ref [0]
+0.0,//caso_upd_weight_ref [1]
+1.0,//stm_weight_ref [2]
+2.0,//ltm_weight_ref [3]
+1.0,//caso_weight_entity_ref [4]
+1.0,//caso_weight_sense_ref [5]
+2.0,//caso_event_ref [6]
+1.0,//caso_deelay_ref [7]
+1.0,//n_deelay_index_ref [8]
+1.0,//last_id_extracted_output_ref [9]
+2.0,//caso_last_id_ref [10]
+0.0,//caso_obj_ref [11]
+0.0,//obj_selected_ref [12]
+400.0,//distance_threshold_ref [13]
+3.0,//caso_stm_ltm_ref [14]
+10.0,//n_stm_ref [15]
+6.0,//n_ltm_ref [16]
+1.0,//id_robot [17]
+1.0,//id_walk [18]
+2.0,//id_sit [19]
+3.0,//id_run [20]
+4.0//id_stand [21]
+};
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+//args_ad  HL_4
+const int arg_ad_HL_4[nr_argAd]={
+57,//nr_seeao
+3,//n_sense
+11,//n_entity
+18,//n_event
+20,//n_action
+4,//n_output
+7//nr_obj
+};
+////////////////////////////////////////////////
+//matrix seeao num HL_4
+const int SEEAO_HL_4[nr_seeao_max][nc_seeao]={
+{1,1,1,1,1},
+{1,1,1,2,4},
+{1,1,1,3,2},
+{1,1,1,5,4},
+{1,1,1,4,1},
+{1,2,2,1,1},
+{1,2,2,2,4},
+{1,2,2,3,2},
+{1,2,2,5,4},
+{1,3,3,1,1},
+{1,3,3,2,4},
+{1,3,3,3,2},
+{1,3,3,5,4},
+{1,4,4,1,1},
+{1,4,4,6,2},
+{1,4,4,3,4},
+{1,5,5,1,1},
+{1,6,6,7,1},
+{1,6,6,15,4},
+{1,6,6,8,1},
+{1,6,6,9,4},
+{1,7,7,10,4},
+{1,7,7,11,1},
+{1,7,7,12,4},
+{1,8,8,7,1},
+{1,8,8,15,4},
+{1,8,8,8,3},
+{1,8,8,9,4},
+{1,9,9,10,4},
+{1,9,9,11,1},
+{1,9,9,12,4},
+{1,10,10,13,3},
+{1,10,10,14,4},
+{1,11,11,19,4},
+{1,11,11,20,1},
+{2,1,12,1,1},
+{2,1,12,2,4},
+{2,1,12,3,4},
+{2,1,12,5,4},
+{2,1,12,4,1},
+{2,2,13,1,1},
+{2,2,13,2,4},
+{2,2,13,3,4},
+{2,2,13,5,2},
+{2,3,14,1,1},
+{2,3,14,2,4},
+{2,3,14,3,4},
+{2,3,14,5,4},
+{2,3,14,16,1},
+{2,4,15,1,1},
+{2,4,15,6,2},
+{2,4,15,3,4},
+{2,5,16,1,1},
+{3,10,17,13,3},
+{3,10,17,14,4},
+{3,11,18,18,4},
+{3,11,18,17,1}
+};
+////////////////////////////////////////////////
+//matrix_obj_xye_num HL_4
+const double obj_xye_HL_4[nr_obj_max][nc_obj] = {
+{400.0,270.0,2.0},
+{4000.0,270.0,2.0},
+{1400.0,450.00,5.0},
+{1200.0,680.0,2.0},
+{3000.0,450.0,5.0},
+{200.0,200.0,3.0},
+{4000.0,700.0,3.0}
+};
+////////////////////////////////////////////////
+//importance_matrix_num HL_4
+//sense importance matrix
+const double importance_sense_HL_4[nr_impSense_max] = {
+10.0,
+10.0,
+10.0,
+10.0,
+10.0
+};
+//entity importance matrix
+const double importance_entity_HL_4[nr_impEntity_max] = {
+10.0,
+10.0,
+10.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0
+};
+////////////////////////////////////////////////
+/////// HF_5 ///////
+//args  HF_5
+//vecArg
+const double arg_us_HF_5[n_arg_all] = {
+50.0,//upd_weight_ref [0]
+0.0,//caso_upd_weight_ref [1]
+1.0,//stm_weight_ref [2]
+2.0,//ltm_weight_ref [3]
+1.0,//caso_weight_entity_ref [4]
+1.0,//caso_weight_sense_ref [5]
+2.0,//caso_event_ref [6]
+1.0,//caso_deelay_ref [7]
+1.0,//n_deelay_index_ref [8]
+1.0,//last_id_extracted_output_ref [9]
+2.0,//caso_last_id_ref [10]
+0.0,//caso_obj_ref [11]
+0.0,//obj_selected_ref [12]
+400.0,//distance_threshold_ref [13]
+3.0,//caso_stm_ltm_ref [14]
+10.0,//n_stm_ref [15]
+6.0,//n_ltm_ref [16]
+1.0,//id_robot [17]
+1.0,//id_walk [18]
+2.0,//id_sit [19]
+3.0,//id_run [20]
+4.0//id_stand [21]
+};
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+//args_ad  HF_5
+const int arg_ad_HF_5[nr_argAd]={
+35,//nr_seeao
+1,//n_sense
+11,//n_entity
+11,//n_event
+20,//n_action
+4,//n_output
+7//nr_obj
+};
+////////////////////////////////////////////////
+//matrix seeao num HF_5
+const int SEEAO_HF_5[nr_seeao_max][nc_seeao]={
+{1,1,1,1,1},
+{1,1,1,2,4},
+{1,1,1,3,2},
+{1,1,1,5,4},
+{1,1,1,4,1},
+{1,2,2,1,1},
+{1,2,2,2,4},
+{1,2,2,3,2},
+{1,2,2,5,4},
+{1,3,3,1,1},
+{1,3,3,2,4},
+{1,3,3,3,2},
+{1,3,3,5,4},
+{1,4,4,1,1},
+{1,4,4,6,2},
+{1,4,4,3,4},
+{1,5,5,1,1},
+{1,6,6,7,1},
+{1,6,6,15,4},
+{1,6,6,8,1},
+{1,6,6,9,4},
+{1,7,7,10,4},
+{1,7,7,11,1},
+{1,7,7,12,4},
+{1,8,8,7,1},
+{1,8,8,15,4},
+{1,8,8,8,3},
+{1,8,8,9,4},
+{1,9,9,10,4},
+{1,9,9,11,1},
+{1,9,9,12,4},
+{1,10,10,13,3},
+{1,10,10,14,4},
+{1,11,11,19,4},
+{1,11,11,20,1},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0},
+{0,0,0,0,0}
+};
+////////////////////////////////////////////////
+//matrix_obj_xye_num HF_5
+const double obj_xye_HF_5[nr_obj_max][nc_obj] = {
+{400.0,270.0,2.0},
+{4000.0,270.0,2.0},
+{1400.0,450.00,5.0},
+{1200.0,680.0,2.0},
+{3000.0,450.0,5.0},
+{200.0,200.0,3.0},
+{4000.0,700.0,3.0}
+};
+////////////////////////////////////////////////
+//importance_matrix_num HF_5
+//sense importance matrix
+const double importance_sense_HF_5[nr_impSense_max] = {
+10.0,
+10.0,
+10.0,
+0.0,
+0.0
+};
+//entity importance matrix
+const double importance_entity_HF_5[nr_impEntity_max] = {
+10.0,
+10.0,
+10.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0,
+5.0
+};
+////////////////////////////////////////////////
+// Robot Instances
+**ROB_INST**
+//
+
+// Controller Instances (one for each robot)
+**ORCH_INST**
+//
+
+/**
+* MISSION DEFINITION
+**/
+
+// Human Instances
+// -&gt; DEFINE HUMAN PATTERNS
+**HUM_INST**
+//
+
+system
+**ALL_INST**
+;
+</system>
+	<queries>
+	</queries>
+</nta>

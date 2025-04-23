@@ -6,16 +6,14 @@ from sklearn.exceptions import InconsistentVersionWarning
 from typing import Dict
 import multiprocessing
 import time
-import sys
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import SGDRegressor
 from sklearn.base import clone
 import numpy as np
 import utils as ut
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
-from utils.datacleaner import categorical_to_numeric
 from self_repair.mc_opt_interface import *
 
 def oversample_method(method_name: str, invalid_configs: pd.DataFrame, regressor=None, previous_configs: pd.DataFrame = None) -> Dict:
@@ -93,11 +91,11 @@ def oversample_and_validation(method: Dict, previous_data: pd.DataFrame, regress
     logger.debug(f"{method['method']} oversampling concluded: mean epsilon was: {np.mean(epsilon_array)}")
     return {"method": method["method"], "epsilon_array": epsilon_array}
 
-def train_new_regressor(training_set: pd.DataFrame, points_regressor):
+def train_new_regressor(training_set: pd.DataFrame):
     X_train = training_set.drop(columns=["SCS"])
     y_train = training_set["SCS"]
 
-    regressor = RandomForestRegressor(n_estimators=points_regressor, random_state=42)
+    regressor = SGDRegressor(random_state=42)
     regressor.fit(X_train, y_train)
 
     logger.debug("New regressor trained successfully")
@@ -110,11 +108,11 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     dataset = ut.prepare_dataset(data_path)
 
     # Model checker, ground truth regressor
-    ground_truth_regressor = train_new_regressor(dataset, 1000)
+    ground_truth_regressor = train_new_regressor(dataset)
     logger.debug(f"Training new regressor with {points_regressor} points")
-    #dataset = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
+    dataset = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
     # stupid regressor trained with at least 1/10 of data of gorund truth
-    regressor = train_new_regressor(dataset, points_regressor)
+    regressor = train_new_regressor(dataset)
 
     # Transformation rules for dataset
     data_path = "datasets/initial_configurations_to_improve.csv"
@@ -137,11 +135,11 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     logger.debug(f"Number of invalid configurations: {len(invalid_configs)}")
     stats.append({"method": "no oversampling", "epsilon_array": epsilon_array})
 
-    # Second verification: 
+    # Second verification:
     # 3 possible configurations: 
     # 1. Use the invalid configurations from the first verification
     # 2. Use the the entire dataset of the first verification
-    # 3. Use a brand new dataset    
+    # 3. Use a brand new dataset 
     if data_type_second_validation == "invalid_configs":
         second_test = invalid_configs 
     elif data_type_second_validation == "first_verification":

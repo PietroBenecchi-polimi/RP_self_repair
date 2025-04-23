@@ -1,0 +1,5756 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+<declaration>
+// Human Channels
+broadcast chan start_h_action, stop_h_action, h_fail;
+
+// Robot Channels
+broadcast chan start_r_action, stop_r_action, r_still;
+
+// Battery Channels
+broadcast chan start_recharging[int], stop_recharging, dead_battery;
+
+// Orchestrator Channels
+broadcast chan opchk_start, opchk_stop, opchk_scs, opchk_fail;
+broadcast chan publish_m[int];
+
+/**
+*** CONSTANTS
+**/
+const double PI = 3.1415926535;
+const double INT16_MAX = 32767.0;
+
+
+// Human Fatigue Profiles [fatiguing rate, recovery rate]
+// MET = ln(1-epsilon)/(-lambda)
+const double YOUNG_HEALTHY[2] = {0.0005, 0.0005}; // approx. 1380s
+
+// Pre-Simulation
+
+const double YOUNG_SICK[2] = {0.001865, 0.005117};
+const double YOUNG_SICK_SIGMA[2] = {0.000719, 0.000001};
+
+const double ELDERLY_HEALTHY[2] = {0.000409, 0.000450};
+const double ELDERLY_HEALTHY_SIGMA[2] = {0.000091, 0.000119};
+
+// Post-Simulation
+/*
+const double YOUNG_SICK[2] = {0.004538, 0.003328};
+const double YOUNG_SICK_SIGMA[2] = {0.000469, 0.001342};
+
+const double ELDERLY_HEALTHY[2] = {0.000553, 0.000302};
+const double ELDERLY_HEALTHY_SIGMA[2] = {0.004548, 0.000175};
+*/
+
+//
+const double ELDERLY_SICK[2] = {0.005, 0.004}; // approx. 350s
+const double YOUNG_UNSTEADY[2] = {0.025, 0.001}; // approx. 280s
+const double ELDERLY_UNSTEADY[2] = {0.035, 0.001};
+
+const int F_max = 1;
+
+/**
+** ERRORS PARAMS
+**/
+const int Tpoll = 1;
+
+const int H1_ERR = 0;
+const int H2_ERR = 0;
+const int H3_ERR = 7;
+const int H4_ERR = 0;
+
+// obey/disobey
+const int DISABLED_WEIGHTS[2] = {100, 0};
+const int HIGH_WEIGHTS[2] = {90, 10};
+const int NORMAL_WEIGHTS[2] = {95, 5};
+const int LOW_WEIGHTS[2] = {99, 1};
+
+// free will
+const int FW_max = 100;
+const int DISABLED_FW = 101;
+const int NORMAL_FW = 99;
+const int HIGH_FW = 95;
+const int LOW_FW = 100;
+
+// timer expired
+const int DISABLED_DELTA = 9999;
+const int HIGH_DELTA = 200;
+const int NORMAL_DELTA = 400;
+const int LOW_DELTA = 800;
+
+// safety distance
+bool is_crit = false;
+bool ignore_crit = false;
+int collisions = 0;
+
+const int DISABLED_LAMBDA = 9999;
+const int HIGH_LAMBDA = 1;
+const int NORMAL_LAMBDA = 10;
+const int LOW_LAMBDA = 10000;
+
+// critical status
+const int FS = 1000;
+const int DISABLED_CRIT = 0;
+const int HIGH_CRIT = 2;
+const int NORMAL_CRIT = 1;
+const int LOW_CRIT = 0;
+
+typedef struct {
+    int obey, disobey;
+    int FW_th;
+    int delta_x100;
+    int lambda_inv;
+    int crit;
+} ERR_PROF;
+
+ERR_PROF get_error_params(int p) {
+    ERR_PROF res = {LOW_WEIGHTS[0], LOW_WEIGHTS[1], LOW_FW, LOW_DELTA, LOW_LAMBDA, LOW_CRIT};
+
+    if(p==1) { // busy professional
+        res.FW_th = HIGH_FW;
+        res.delta_x100 = HIGH_DELTA;
+    }
+    else if(p==2) { // free professional
+        res.FW_th = LOW_FW;
+        res.delta_x100 = LOW_DELTA;
+    }
+    else if(p==3) { // unexperienced professional
+        res.lambda_inv = HIGH_LAMBDA;
+    }
+    else if(p==4) { // experienced professional
+        res.lambda_inv = LOW_LAMBDA;
+    }
+    else if(p==5) { // critical patient
+        res.crit = HIGH_CRIT;
+    }
+    else if(p==6) { // stable patient
+        res.crit = NORMAL_CRIT;
+    }
+    else if(p==7) { // distracted patient
+        res.obey = HIGH_WEIGHTS[0];
+        res.disobey = HIGH_WEIGHTS[1];
+        res.FW_th = HIGH_FW;
+    }
+    else if(p==8) { // focused patient
+        res.FW_th = LOW_FW;
+        res.obey = LOW_WEIGHTS[0];
+        res.disobey = LOW_WEIGHTS[1];
+    }
+    else {
+        res.FW_th = DISABLED_FW;
+        res.obey = DISABLED_WEIGHTS[0];
+        res.disobey = DISABLED_WEIGHTS[1];
+        res.delta_x100 = DISABLED_DELTA;
+        res.lambda_inv = DISABLED_LAMBDA;
+        res.crit = DISABLED_CRIT;
+    }
+
+    return res;
+}
+
+/**
+*** VARIABLES
+**/
+
+// Mission Mgmt
+const int R = 1;
+
+int currOp[R] = {1};
+double dX[R], dY[R];
+
+bool stop[R] = {false};
+bool startHuman = false;
+bool stopHuman = false;
+bool exeRobot = false;
+bool fail = false;
+bool scs = false;
+//
+const int MAX_BUFF_SIZE = 50;
+
+// Robot Mgmt
+bool active_robot[R] = {true};
+int currR = 1; //current robot
+int coR = -1;  //co-robot
+bool synch = false;    //used to check if the syncrhonization between the two robots has happened (task handover pattern)
+/*
+** Added for multi-robot TESTING
+*/
+bool busy[R] = {false};
+
+// Human Mgmt
+int currH = 1;
+int hExe = 0;
+
+// Sensor Outputs
+double batteryCharge[R] = {100.0};
+double internal_charge[R] = {-1.0};
+
+double robPositionX[R];
+double robPositionY[R];
+double internalRobX[R], internalRobY[R];
+
+/**
+* MISSION DEFINITION
+**/
+
+// -&gt; HOW MANY HUMANS TO SERVE IN THE MISSION
+const int H = 5;
+
+
+bool served[H] = {false,false,false,false,false};
+bool objectTaken[H] = {false,false,false,false,false};
+double humanFatigue[H] = {0.0,0.0,0.0,0.0,0.0};
+double humanPositionX[H] = {0.0,0.0,0.0,0.0,0.0};
+double humanPositionY[H] = {0.0,0.0,0.0,0.0,0.0};
+double humTheta[H] = {0.0,0.0,0.0,0.0,0.0};
+
+double internalFatigue[H] = {0.0,0.0,0.0,0.0,0.0};
+double internalHumX[H] = {0.0,0.0,0.0,0.0,0.0};
+double internalHumY[H] = {0.0,0.0,0.0,0.0,0.0};
+
+const int ND = -1;
+const double NDD = -1.0;
+int PATH = 0;
+
+int SAME_H_IDs[H][H] = {{1,4,5,-1,-1},{2,3,-1,-1,-1},{3,2,-1,-1,-1},{4,1,5,-1,-1},{5,1,4,-1,-1}};
+
+// -&gt; DEFINE PATTERN SEQUENCE (make sure it is consistent with humans ids)
+// 0: human follower, 1: human leader, 2: human recipient, 3: human applicant,
+// 10: human_rescuer, (11: human_interdependence_mission,) 12: human competitor
+int patterns[H] = {0,1,1,1,0};
+int patterns_alt1[H] = {0,1,1,1,0};
+int patterns_alt2[H] = {0,1,1,1,0};
+//
+
+// -&gt; DEFINE STARTING LOCATIONS IN CARTESIAN PLAN
+double startX[H] = {2500.0,92.5,1400.0,400.0,500.0};
+double startY[H] = {500.0,761.2,200.0,200.0,200.0};
+
+double startX_alt1[H] = {2500.0,92.5,1400.0,400.0,500.0};
+double startY_alt1[H] = {500.0,761.2,200.0,200.0,200.0};
+double startX_alt2[H] = {2500.0,92.5,1400.0,400.0,500.0};
+double startY_alt2[H] = {500.0,761.2,200.0,200.0,200.0};
+
+// -&gt; DEFINE DESTINATIONS IN CARTESIAN PLAN
+// the definition of destination can vary depending on the pattern,
+// and you can decide what it corresponds to for your specific pattern
+double destX[H] = {400.0,1400.0,3000.0,500.0,3000.0};
+double destY[H] = {200.0,200.0,200.0,200.0,200.0};
+
+double destX_alt1[H] = {400.0,1400.0,3000.0,500.0,3000.0};
+double destY_alt1[H] = {200.0,200.0,200.0,200.0,200.0};
+double destX_alt2[H] = {400.0,1400.0,3000.0,500.0,3000.0};
+double destY_alt2[H] = {200.0,200.0,200.0,200.0,200.0};
+
+/**
+* PARAMS FOR RESCUER AND APPLICANT (task size and dexterity)
+**/
+
+const int task_size = 150;
+int dext = 1;
+int task_completion = 0;
+
+/**
+*** FLOOR PLAN
+**/
+const int N_A = 10;
+
+const int N_P = 10;
+
+const int N_I = 9;
+
+
+typedef double point[2];
+typedef point area[4];
+typedef area layout[N_A];
+typedef point trajectory[N_P];
+
+const layout FLOOR = {{{0.0, 110.0},{0.0, 299.5},{1550.0, 299.5},{1550.0, 110.0}},{{0.0, 110.0},{0.0, 850.0},{185.0, 850.0},{185.0, 110.0}},{{0.0, 672.5},{0.0, 850.0},{1550.0, 850.0},{1550.0, 672.5}},{{1352.0, 110.0},{1352.0, 850.0},{1550.0, 850.0},{1550.0, 110.0}},{{2970.0, 110.0},{2970.0, 299.5},{4512.5, 299.5},{4512.5, 110.0}},{{2970.0, 110.0},{2970.0, 850.0},{3155.0, 850.0},{3155.0, 110.0}},{{2970.0, 672.5},{2970.0, 850.0},{4512.5, 850.0},{4512.5, 672.5}},{{4322.0, 110.0},{4322.0, 850.0},{4512.5, 850.0},{4512.5, 110.0}},{{1945.0, 0.0},{1945.0, 695.0},{2670.0, 695.0},{2670.0, 0.0}},{{1352.0, 110.0},{1352.0, 425.0},{3155.0, 425.0},{3155.0, 110.0}}};
+
+const point INTERSECTIONS[N_I] = {{92.5, 163.5},{92.5, 761.2},{1452.0, 761.2},{1452.0, 163.5},{3062.5, 163.5},{4417.0, 163.5},{3062.5, 761.2},{4417.0, 761.2},{2253.5, 267.5}};
+
+
+// I apologize for the four doubles,
+// but it seems to be bugging when arrays are passed as arguments.
+bool same_area(double sx, double sy, double dx, double dy) {
+    int i;
+    bool x_s_in, y_s_in, x_d_in, y_d_in;
+    for (i = 0; i &lt; N_A; i++)
+    {
+        x_s_in = sx &gt; FLOOR[i][0][0] &amp;&amp; sx &lt; FLOOR[i][3][0];
+        y_s_in = sy &gt; FLOOR[i][0][1] &amp;&amp; sy &lt; FLOOR[i][1][1];
+        x_d_in = dx &gt; FLOOR[i][0][0] &amp;&amp; dx &lt; FLOOR[i][3][0];
+        y_d_in = dy &gt; FLOOR[i][0][1] &amp;&amp; dy &lt; FLOOR[i][1][1];
+        if ((x_s_in &amp;&amp; y_s_in) &amp;&amp; (x_d_in &amp;&amp; y_d_in)) // start and dest in same area
+            return true;
+    }
+    return false;
+}
+
+// same.
+double pt_dist(double x1, double x2, double y1, double y2) {
+    double xdifference = x2-x1;
+    double ydifference = y2-y1;
+    return sqrt((xdifference*xdifference)+(ydifference*ydifference));
+}
+
+double calculateDistance() {
+    double xdifference = pow(robPositionX[currR-1]-humanPositionX[currH-1], 2);
+    double ydifference = pow(robPositionY[currR-1]-humanPositionY[currH-1], 2);
+    double distance = sqrt(xdifference + ydifference)/100;
+
+    if(distance&lt;0) return -distance;
+    else return distance;
+}
+
+// Wall Corner Points
+const point rechargeStation = {220.0, 320.00};
+</declaration>
+<template>
+    <name>Human_Applicant</name>
+    <parameter>int id, double _v, int p_f, int p_fw, int p_dext, int path</parameter>
+    <declaration>
+/* general comments
+- if the person is far from the objective, it will move towards it, otherwise it will wait for the command to
+sincronyze and start executing.
+- functions for moving the humans are the same of human leader, they can be globally packaged maybe?
+*/
+clock t, F;
+clock tUpd;
+clock tWH;
+clock tExp;
+
+double Fp;
+double lambda, mi;
+
+// Errors Model
+int obey, disobey;
+double freeWillTh;
+double fw;
+int TE;
+double lambda_crit;
+double hs, crit, non_crit;
+
+//this sets the state of the mission: getting to objective or working at mission
+bool exeMission = false;
+//threshHold for completing the mission
+const double tWHTh = 60.0;
+
+
+bool checkDist() {
+    return pt_dist(internalHumX[id - 1], destX[id - 1], internalHumY[id - 1], destY[id - 1]) &lt;= 50.0;
+}
+
+void initHuman() {
+    double dist_to_dest = pt_dist(startX[id-1], destX[id-1], startY[id-1], destY[id-1]);
+    ERR_PROF error_profile;
+
+    F = 0;
+    Fp = 0;
+    t = 0;
+    tWH = 0;
+    tUpd = 0;
+
+    if(path==ND) {
+        humanPositionX[id - 1] = startX[id-1];
+        humanPositionY[id - 1] = startY[id-1];
+    } else if(path==1) {
+        humanPositionX[id - 1] = startX_alt1[id-1];
+        humanPositionY[id - 1] = startY_alt1[id-1];
+    } else {
+        humanPositionX[id - 1] = startX_alt2[id-1];
+        humanPositionY[id - 1] = startY_alt2[id-1];
+    }
+
+    internalHumX[id - 1] = humanPositionX[id - 1];
+    internalHumY[id - 1] = humanPositionY[id - 1];
+
+    // unfortunately the switch case is not supported yet
+    if (p_f == 1)
+    {
+        lambda = YOUNG_HEALTHY[0];
+        mi = YOUNG_HEALTHY[1];
+    }
+    else if (p_f == 2)
+    {
+        lambda = random_normal(YOUNG_SICK[0], YOUNG_SICK_SIGMA[0]);
+        mi = random_normal(YOUNG_SICK[1], YOUNG_SICK_SIGMA[1]);
+    }
+    else if (p_f == 3)
+    {
+        lambda = random_normal(ELDERLY_HEALTHY[0], ELDERLY_HEALTHY_SIGMA[0]);
+        mi = random_normal(ELDERLY_HEALTHY[1], ELDERLY_HEALTHY_SIGMA[1]);
+    }
+    else if (p_f == 4)
+    {
+        lambda = ELDERLY_SICK[0];
+        mi = ELDERLY_SICK[1];
+    }
+    else if (p_f == 5)
+    {
+        lambda = YOUNG_UNSTEADY[0];
+        mi = YOUNG_UNSTEADY[1];
+    }
+    else if (p_f == 6)
+    {
+        lambda = ELDERLY_UNSTEADY[0];
+        mi = ELDERLY_UNSTEADY[1];
+    }
+    else
+    {
+        lambda = 0.005;
+        mi = 0.005; //default values
+    }
+
+    error_profile = get_error_params(p_fw);
+    obey = error_profile.obey;
+    disobey = error_profile.disobey;
+    freeWillTh = error_profile.FW_th;
+    if(dist_to_dest&lt;1.0) TE = 999;
+    else TE = fint(dist_to_dest / _v * (error_profile.delta_x100/100));
+    lambda_crit = 1/error_profile.lambda_inv;
+    hs = error_profile.crit;
+    crit = 1.0;
+    non_crit = 999.0;
+
+    exeMission = checkDist();
+}
+
+void updateF(double coeff, bool walking) {
+    if (walking)
+    {
+        internalFatigue[id - 1] = 1 - (1 - internalFatigue[id - 1]) * exp(coeff * Tpoll);
+    }
+    else
+    {
+        internalFatigue[id - 1] = internalFatigue[id - 1] * exp(coeff * Tpoll);
+    }
+
+    internalFatigue[id - 1] = fmax(0, internalFatigue[id - 1]);
+}
+
+trajectory traj = {{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0}};
+double ort = 0.0;
+int curr_traj = 0;
+
+void change_orientation(double sx, double sy, double dx, double dy) {
+    double cos_alpha, alpha, theta, delta;
+    double AC, AB;
+    bool turnLeft, needsTurning = false;
+
+    AC = pt_dist(sx, dx, sy, sy);
+    AB = pt_dist(sx, dx, sy, dy);
+
+    if (AB == 0)
+    {
+        return;
+    }
+
+    cos_alpha = AC / AB;
+    // angle between destination and hor. line
+    alpha = acos(cos_alpha);
+    // angle between robot axis and hor. line
+    theta = ort * 180 / PI;
+    // how much the robot should rotate [deg]
+    delta = 0.0;
+    turnLeft = false;
+
+    if (dx &gt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 1st quadrant
+        alpha = alpha * (180 / PI);
+        if (alpha &gt; theta)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &gt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 2nd quadrant
+        alpha = -alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 3rd quadrant
+        alpha = -(180 - alpha * (180 / PI));
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 4th quadrant
+        alpha = 180 - alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+
+    needsTurning = delta &gt; 0.0;
+
+    if (needsTurning &amp;&amp; turnLeft)
+    {
+        ort = ort * 180 / PI + delta;
+    }
+    else if (needsTurning &amp;&amp; !turnLeft)
+    {
+        ort = ort * 180 / PI - delta;
+    }
+}
+
+point curr, dest;
+
+void plan_traj() {
+    int i, j, next_inters = -1;
+    int neigh[5] = {-1,-1,-1,-1,-1};
+    int k = 0;
+    double dist, min_dist;
+    bool visited[N_I] = {false,false,false,false,false,false,false,false,false};
+            curr[0] = internalHumX[id-1]; curr[1] = internalHumY[id-1];
+    dest[0] = destX[id-1]; dest[1] = destY[id-1];
+    // init trajectory
+    for (i = 0; i &lt; N_P; i++)
+    {
+        traj[i][0] = 0.0;
+        traj[i][1] = 0.0;
+    }
+    i = 0;
+    curr_traj = 0;
+
+    // builds trajectory by finding a path among adjacent areas
+    // (the existence of an intersection point means two areas are adjacent to each other)
+    // until the destination area is reached
+    while (!same_area(curr[0], curr[1], dest[0], dest[1]))
+    {
+        for (j = 0; j &lt; N_I; j++)
+        {
+            // find all int. pts which are a neighbor of curr. point
+            // there are max. 3 in the long left hall
+            if (same_area(curr[0], curr[1], INTERSECTIONS[j][0], INTERSECTIONS[j][1]) &amp;&amp; !visited[j])
+            {
+                neigh[k] = j;
+                k++;
+            }
+        }
+        // next int. point to add to traj. is the closest to destination
+        min_dist = pt_dist(INTERSECTIONS[neigh[0]][0], dest[0], INTERSECTIONS[neigh[0]][1], dest[1]);
+        next_inters = neigh[0];
+        for (j = 1; j &lt; 5 &amp;&amp; neigh[j] != -1; j++)
+        {
+            dist = pt_dist(INTERSECTIONS[neigh[j]][0], dest[0], INTERSECTIONS[neigh[j]][1], dest[1]);
+            if (dist &lt; min_dist)
+            {
+                min_dist = dist;
+                next_inters = neigh[j];
+            }
+        }
+        // if trajectory is full, or no next point has been found,
+        // something has gone wrong, but I cannot raise an exception
+        if (i == N_P - 1 || next_inters == -1)
+            return;
+        // next inters point is set as visited,
+        visited[next_inters] = true;
+        // added to the trajectory,
+        traj[i][0] = INTERSECTIONS[next_inters][0];
+        traj[i][1] = INTERSECTIONS[next_inters][1];
+        i++;
+        // and set as current point
+        curr[0] = INTERSECTIONS[next_inters][0];
+        curr[1] = INTERSECTIONS[next_inters][1];
+        // reset
+        next_inters = -1;
+        k = 0;
+        for(j=0; j&lt;5;j++) neigh[j] = -1;
+    }
+    // destination point is always part of the trajectory
+    traj[i][0] = dest[0];
+    traj[i][1] = dest[1];
+
+    //sets initial orientation
+    change_orientation(internalHumX[id-1], internalHumY[id-1], traj[0][0], traj[0][1]);
+}
+
+void updateP() {
+    double eps = 0.0;
+    exeMission = checkDist();
+    if (exeMission) return;
+
+    if (curr_traj &gt;= N_P || (traj[curr_traj][0] == 0.0 &amp;&amp; traj[curr_traj][1] == 0.0))
+        return;
+
+    if (pt_dist(internalHumX[id - 1], traj[curr_traj][0], internalHumY[id - 1], traj[curr_traj][1]) &lt; _v * 1.1)
+    {
+        curr_traj++;
+        if (curr_traj &gt;= N_P)
+        return;
+        change_orientation(internalHumX[id - 1], internalHumY[id - 1], traj[curr_traj][0], traj[curr_traj][1]);
+    }
+
+    internalHumX[id - 1] = internalHumX[id - 1] + _v * Tpoll * cos(ort * PI / 180);
+    internalHumY[id - 1] = internalHumY[id - 1] + _v * Tpoll * sin(ort * PI / 180);
+}
+
+
+void start_moving() {
+    F = 0;
+    t = 0;
+    tUpd = 0;
+    fw = 0;
+    plan_traj();
+}
+</declaration>
+    <location id="id0" x="-815" y="-51">
+        <name x="-825" y="-85">h_init</name>
+        <committed/>
+    </location>
+    <location id="id1" x="-620" y="-51" color="#0000ff">
+        <name x="-630" y="-85">h_idle</name>
+        <label kind="invariant" x="-671" y="-34">t' == 1
+&amp;&amp; tWH' ==0
+&amp;&amp; F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+    </location>
+    <location id="id2" x="-161" y="-178" color="#0000ff">
+        <name x="-204" y="-161">h_executing</name>
+        <label kind="invariant" x="-153" y="-289">t' == 1 &amp;&amp; tExp'==0
+&amp;&amp; tWH' == p_dext
+&amp;&amp; tWH &lt;= tWHTh
+&amp;&amp; F &lt;= F_max
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+    </location>
+    <location id="id3" x="-161" y="212" color="#0000ff">
+        <name x="-171" y="178">h_busy</name>
+        <label kind="invariant" x="-221" y="221">t' == 1
+&amp;&amp; tWH' == 0
+&amp;&amp; F &lt;= F_max
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+    </location>
+    <location id="id4" x="-748" y="-331">
+        <committed/>
+    </location>
+    <location id="id5" x="-620" y="-332">
+        <committed/>
+    </location>
+    <location id="id6" x="170" y="-119">
+        <committed/>
+    </location>
+    <location id="id7" x="170" y="-178">
+        <committed/>
+    </location>
+    <location id="id8" x="153" y="212">
+        <committed/>
+    </location>
+    <location id="id9" x="153" y="297">
+        <committed/>
+    </location>
+    <location id="id10" x="-382" y="-178">
+        <urgent/>
+    </location>
+    <location id="id11" x="-365" y="110">
+        <urgent/>
+    </location>
+    <location id="id12" x="17" y="25" color="#ff0000">
+        <name x="68" y="-17">failed</name>
+        <label kind="invariant" x="68" y="0">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tWH' == 0</label>
+        <label kind="exponentialrate" x="42" y="17">1</label>
+    </location>
+    <location id="id13" x="-510" y="-144">
+        <name x="-527" y="-170">c1</name>
+        <committed/>
+    </location>
+    <location id="id14" x="-161" y="51">
+        <name x="-152" y="26">c2</name>
+        <committed/>
+    </location>
+    <branchpoint id="id15" x="-161" y="-59">
+    </branchpoint>
+    <branchpoint id="id16" x="-484" y="-178">
+    </branchpoint>
+    <init ref="id0"/>
+    <transition color="#ff0000">
+        <source ref="id3"/>
+        <target ref="id12"/>
+        <label kind="guard" x="204" y="136">tExp &gt;= TE &amp;&amp; !served[id-1]</label>
+        <nail x="195" y="212"/>
+        <nail x="195" y="93"/>
+    </transition>
+    <transition color="#ff0000">
+        <source ref="id1"/>
+        <target ref="id12"/>
+        <label kind="guard" x="-561" y="-382">tExp &gt;= TE &amp;&amp; !served[id-1]</label>
+        <nail x="-578" y="-357"/>
+        <nail x="195" y="-357"/>
+        <nail x="280" y="-229"/>
+        <nail x="161" y="-34"/>
+    </transition>
+    <transition>
+        <source ref="id15"/>
+        <target ref="id2"/>
+        <label kind="assignment" x="-178" y="-102">hExe=1</label>
+        <label kind="probability" x="-178" y="-119">obey</label>
+    </transition>
+    <transition color="#ff0000">
+        <source ref="id15"/>
+        <target ref="id3"/>
+        <label kind="probability" x="-255" y="51">disobey</label>
+        <nail x="-195" y="59"/>
+    </transition>
+    <transition>
+        <source ref="id14"/>
+        <target ref="id15"/>
+    </transition>
+    <transition>
+        <source ref="id3"/>
+        <target ref="id14"/>
+        <label kind="guard" x="-153" y="76">!served[id-1]
+        &amp;&amp; currH == id
+        &amp;&amp; exeMission</label>
+        <label kind="synchronisation" x="-153" y="127">start_h_action?</label>
+    </transition>
+    <transition>
+        <source ref="id13"/>
+        <target ref="id16"/>
+    </transition>
+    <transition>
+        <source ref="id1"/>
+        <target ref="id13"/>
+        <label kind="guard" x="-586" y="-127">!served[id-1] &amp;&amp; currH == id
+&amp;&amp; exeMission</label>
+        <label kind="synchronisation" x="-586" y="-76">start_h_action?</label>
+    </transition>
+    <transition color="#ff0000">
+        <source ref="id16"/>
+        <target ref="id1"/>
+        <label kind="probability" x="-561" y="-195">disobey</label>
+        <nail x="-493" y="-178"/>
+        <nail x="-578" y="-178"/>
+    </transition>
+    <transition>
+        <source ref="id16"/>
+        <target ref="id10"/>
+        <label kind="assignment" x="-467" y="-178">hExe=1</label>
+        <label kind="probability" x="-467" y="-195">obey</label>
+    </transition>
+    <transition>
+        <source ref="id2"/>
+        <target ref="id1"/>
+        <label kind="synchronisation" x="-374" y="-110">stop_h_action?</label>
+        <label kind="assignment" x="-408" y="-93">t=0, Fp=F, tUpd=0,hExe=0</label>
+        <nail x="-246" y="-102"/>
+        <nail x="-518" y="-102"/>
+    </transition>
+    <transition>
+        <source ref="id12"/>
+        <target ref="id12"/>
+        <nail x="59" y="8"/>
+        <nail x="59" y="8"/>
+        <nail x="59" y="42"/>
+    </transition>
+    <transition>
+        <source ref="id3"/>
+        <target ref="id12"/>
+        <label kind="guard" x="25" y="59">F &gt;= F_max</label>
+        <label kind="synchronisation" x="25" y="76">h_fail!</label>
+        <label kind="assignment" x="25" y="93">t = 0</label>
+        <nail x="17" y="212"/>
+    </transition>
+    <transition>
+        <source ref="id2"/>
+        <target ref="id12"/>
+        <label kind="guard" x="-76" y="-85">F &gt;= F_max</label>
+        <label kind="synchronisation" x="-76" y="-68">h_fail!</label>
+        <label kind="assignment" x="-76" y="-51">t = 0, hExe=0</label>
+        <nail x="-76" y="-34"/>
+        <nail x="17" y="-34"/>
+    </transition>
+    <transition color="#ff0000">
+        <source ref="id3"/>
+        <target ref="id1"/>
+        <label kind="guard" x="-620" y="212">!served[id-1] &amp;&amp;
+fw &gt;= freeWillTh &amp;&amp;
+tUpd&gt;=Tpoll</label>
+        <label kind="assignment" x="-620" y="263">t = 0, Fp=F, tUpd=0</label>
+        <nail x="-620" y="212"/>
+    </transition>
+    <transition color="#ff0000">
+        <source ref="id2"/>
+        <target ref="id1"/>
+        <label kind="guard" x="-459" y="-297">!served[id-1] &amp;&amp;
+fw &gt;= freeWillTh &amp;&amp;
+tUpd &gt;= Tpoll</label>
+        <label kind="assignment" x="-459" y="-246">t = 0, Fp=F, tUpd=0, hExe=0</label>
+        <nail x="-161" y="-220"/>
+        <nail x="-595" y="-220"/>
+    </transition>
+    <transition>
+        <source ref="id11"/>
+        <target ref="id3"/>
+        <label kind="guard" x="-306" y="127">F==0</label>
+        <label kind="assignment" x="-306" y="144">Fp=1</label>
+        <nail x="-365" y="144"/>
+        <nail x="-212" y="144"/>
+    </transition>
+    <transition>
+        <source ref="id11"/>
+        <target ref="id3"/>
+        <label kind="guard" x="-331" y="93">F&gt;0</label>
+        <label kind="assignment" x="-297" y="93">Fp = 1-F</label>
+        <nail x="-238" y="110"/>
+    </transition>
+    <transition>
+        <source ref="id1"/>
+        <target ref="id11"/>
+        <label kind="guard" x="-510" y="59">!served[id-1]
+        &amp;&amp; !exeMission</label>
+        <label kind="assignment" x="-510" y="93">start_moving()</label>
+        <nail x="-527" y="110"/>
+    </transition>
+    <transition>
+        <source ref="id10"/>
+        <target ref="id2"/>
+        <label kind="guard" x="-365" y="-127">F==0</label>
+        <label kind="assignment" x="-306" y="-127">Fp= 1</label>
+        <nail x="-382" y="-136"/>
+        <nail x="-263" y="-136"/>
+        <nail x="-263" y="-178"/>
+    </transition>
+    <transition>
+        <source ref="id10"/>
+        <target ref="id2"/>
+        <label kind="guard" x="-340" y="-195">F&gt;0</label>
+        <label kind="assignment" x="-289" y="-195">Fp = 1-F</label>
+    </transition>
+    <transition>
+        <source ref="id8"/>
+        <target ref="id3"/>
+        <label kind="guard" x="25" y="255">currH!=id</label>
+        <label kind="assignment" x="34" y="238">tExp=0</label>
+        <nail x="153" y="255"/>
+        <nail x="-161" y="255"/>
+    </transition>
+    <transition>
+        <source ref="id3"/>
+        <target ref="id8"/>
+        <label kind="guard" x="-51" y="187">tUpd&gt;=Tpoll</label>
+        <label kind="assignment" x="25" y="127">updateF(-lambda, 1),
+updateP(), tUpd=0,
+fw = random(FW_max)</label>
+        <nail x="0" y="212"/>
+    </transition>
+    <transition>
+        <source ref="id9"/>
+        <target ref="id3"/>
+        <label kind="synchronisation" x="25" y="297">publish_m[2]!</label>
+        <nail x="-161" y="297"/>
+    </transition>
+    <transition>
+        <source ref="id2"/>
+        <target ref="id1"/>
+        <label kind="guard" x="-442" y="-68">tWH &gt;= tWHTh</label>
+        <label kind="assignment" x="-442" y="-51">served[currH-1]= true,
+        t = 0, exeMission = 0, Fp=F,
+        tUpd=0, tWH=0,hExe=0</label>
+        <nail x="-229" y="-51"/>
+    </transition>
+    <transition>
+        <source ref="id7"/>
+        <target ref="id6"/>
+        <label kind="guard" x="178" y="-161">currH==id</label>
+        <label kind="synchronisation" x="178" y="-144">publish_m[2]!</label>
+    </transition>
+    <transition>
+        <source ref="id7"/>
+        <target ref="id2"/>
+        <label kind="guard" x="68" y="-161">currH!=id</label>
+        <nail x="127" y="-144"/>
+        <nail x="-102" y="-144"/>
+    </transition>
+    <transition>
+        <source ref="id6"/>
+        <target ref="id2"/>
+        <label kind="synchronisation" x="59" y="-119">publish_m[3]!</label>
+        <nail x="-59" y="-119"/>
+    </transition>
+    <transition>
+        <source ref="id2"/>
+        <target ref="id7"/>
+        <label kind="guard" x="51" y="-221">tUpd&gt;=Tpoll
+        &amp;&amp; tWH &lt; tWHTh</label>
+        <label kind="assignment" x="51" y="-272">updateF(-lambda, 1),
+tUpd=0,
+fw = random(FW_max)</label>
+        <nail x="8" y="-178"/>
+    </transition>
+    <transition>
+        <source ref="id1"/>
+        <target ref="id5"/>
+        <label kind="guard" x="-705" y="-297">tUpd&gt;= Tpoll</label>
+        <label kind="assignment" x="-705" y="-280">updateF(-mi, 0),
+tUpd=0,
+fw = random(FW_max)</label>
+        <nail x="-620" y="-187"/>
+        <nail x="-620" y="-187"/>
+    </transition>
+    <transition>
+        <source ref="id5"/>
+        <target ref="id1"/>
+        <label kind="guard" x="-714" y="-187">currH!=id</label>
+        <label kind="assignment" x="-705" y="-170">tExp=0</label>
+        <nail x="-680" y="-331"/>
+        <nail x="-680" y="-51"/>
+    </transition>
+    <transition>
+        <source ref="id4"/>
+        <target ref="id1"/>
+        <label kind="synchronisation" x="-850" y="-187">publish_m[2]!</label>
+        <nail x="-748" y="-51"/>
+    </transition>
+    <transition>
+        <source ref="id5"/>
+        <target ref="id4"/>
+        <label kind="guard" x="-731" y="-374">currH==id</label>
+        <label kind="synchronisation" x="-731" y="-357">publish_m[3]!</label>
+    </transition>
+    <transition>
+        <source ref="id0"/>
+        <target ref="id1"/>
+        <label kind="assignment" x="-782" y="-51">initHuman()</label>
+    </transition>
+    <transition>
+        <source ref="id8"/>
+        <target ref="id9"/>
+        <label kind="guard" x="170" y="238">currH==id</label>
+        <label kind="synchronisation" x="170" y="255">publish_m[3]!</label>
+    </transition>
+</template>
+	<template>
+		<name>Human_Competitor</name>
+		<parameter>int id, double _v, int p_f, int p_fw, int path</parameter>
+		<declaration>clock t, F;
+clock tUpd;
+clock tExp;
+
+double Fp;
+double lambda, mi;
+
+// Errors Model
+int obey, disobey;
+double freeWillTh;
+double fw;
+int TE;
+double lambda_crit;
+double hs, crit, non_crit;
+
+//TODO coordinates of the eventual position to take the object. At the moment it is the initial position
+double secondDestX = 0.0;
+double secondDestY = 0.0;
+
+bool atDestRobot = false;
+bool atDestHuman = false;
+
+
+// Position Sharing Parameters
+
+void updateF(double coeff, bool walking) {
+    if(walking) internalFatigue[id-1] = 1-(1-internalFatigue[id-1])*exp(coeff*Tpoll);
+    else internalFatigue[id-1] = internalFatigue[id-1]*exp(coeff*Tpoll);
+
+    internalFatigue[id-1] = fmax(0, internalFatigue[id-1]);
+}
+
+trajectory traj = {{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0}};
+double ort = 0.0;
+int curr_traj = 0;
+
+void change_orientation(double sx, double sy, double dx, double dy) {
+    double cos_alpha, alpha, theta, delta;
+    double AC, AB;
+    bool turnLeft, needsTurning = false;
+
+    AC = pt_dist(sx, dx, sy, sy);
+    AB = pt_dist(sx, dx, sy, dy);
+
+    if (AB == 0)
+    {
+        return;
+    }
+
+    cos_alpha = AC / AB;
+    // angle between destination and hor. line
+    alpha = acos(cos_alpha);
+    // angle between robot axis and hor. line
+    theta = ort * 180 / PI;
+    // how much the robot should rotate [deg]
+    delta = 0.0;
+    turnLeft = false;
+
+    if (dx &gt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 1st quadrant
+        alpha = alpha * (180 / PI);
+        if (alpha &gt; theta)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &gt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 2nd quadrant
+        alpha = -alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 3rd quadrant
+        alpha = -(180 - alpha * (180 / PI));
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 4th quadrant
+        alpha = 180 - alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+
+    needsTurning = delta &gt; 0.0;
+
+    if (needsTurning &amp;&amp; turnLeft)
+    {
+        ort = ort * 180 / PI + delta;
+    }
+    else if (needsTurning &amp;&amp; !turnLeft)
+    {
+        ort = ort * 180 / PI - delta;
+    }
+}
+
+point curr, dest;
+
+void plan_traj() {
+    int i, j, next_inters = -1;
+    int neigh[5] = {-1,-1,-1,-1,-1};
+    int k = 0;
+    double dist, min_dist;
+    bool visited[N_I] = {false,false,false,false,false,false,false,false,false};
+            curr[0] = internalHumX[id-1]; curr[1] = internalHumY[id-1];
+    dest[0] = destX[id-1]; dest[1] = destY[id-1];
+    // init trajectory
+    for (i = 0; i &lt; N_P; i++)
+    {
+        traj[i][0] = 0.0;
+        traj[i][1] = 0.0;
+    }
+    i = 0;
+    curr_traj = 0;
+
+    // builds trajectory by finding a path among adjacent areas
+    // (the existence of an intersection point means two areas are adjacent to each other)
+    // until the destination area is reached
+    while (!same_area(curr[0], curr[1], dest[0], dest[1]))
+    {
+        for (j = 0; j &lt; N_I; j++)
+        {
+            // find all int. pts which are a neighbor of curr. point
+            // there are max. 3 in the long left hall
+            if (same_area(curr[0], curr[1], INTERSECTIONS[j][0], INTERSECTIONS[j][1]) &amp;&amp; !visited[j])
+            {
+                neigh[k] = j;
+                k++;
+            }
+        }
+        // next int. point to add to traj. is the closest to destination
+        min_dist = pt_dist(INTERSECTIONS[neigh[0]][0], dest[0], INTERSECTIONS[neigh[0]][1], dest[1]);
+        next_inters = neigh[0];
+        for (j = 1; j &lt; 5 &amp;&amp; neigh[j] != -1; j++)
+        {
+            dist = pt_dist(INTERSECTIONS[neigh[j]][0], dest[0], INTERSECTIONS[neigh[j]][1], dest[1]);
+            if (dist &lt; min_dist)
+            {
+                min_dist = dist;
+                next_inters = neigh[j];
+            }
+        }
+        // if trajectory is full, or no next point has been found,
+        // something has gone wrong, but I cannot raise an exception
+        if (i == N_P - 1 || next_inters == -1)
+            return;
+        // next inters point is set as visited,
+        visited[next_inters] = true;
+        // added to the trajectory,
+        traj[i][0] = INTERSECTIONS[next_inters][0];
+        traj[i][1] = INTERSECTIONS[next_inters][1];
+        i++;
+        // and set as current point
+        curr[0] = INTERSECTIONS[next_inters][0];
+        curr[1] = INTERSECTIONS[next_inters][1];
+        // reset
+        next_inters = -1;
+        k = 0;
+        for(j=0; j&lt;5;j++) neigh[j] = -1;
+    }
+    // destination point is always part of the trajectory
+    traj[i][0] = dest[0];
+    traj[i][1] = dest[1];
+
+    //sets initial orientation
+    change_orientation(internalHumX[id-1], internalHumY[id-1], traj[0][0], traj[0][1]);
+}
+
+void start_moving() {
+    F = 0;
+    t = 0;
+    tUpd=0;
+    hExe = 1;
+    plan_traj();
+}
+
+meta int v;
+
+// double dist_to_dest;
+void updateP() {
+    double eps = 0.0;
+
+    if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+    return;
+
+    if (pt_dist(internalHumX[id-1], traj[curr_traj][0], internalHumY[id-1], traj[curr_traj][1]) &lt; 20.0) {
+        curr_traj++;
+        if (curr_traj &gt;= N_P)
+        return;
+        change_orientation(internalHumX[id-1], internalHumY[id-1], traj[curr_traj][0], traj[curr_traj][1]);
+    }
+
+    internalHumX[id-1] = internalHumX[id-1] + v*Tpoll*cos(ort*PI/180);
+    internalHumY[id-1] = internalHumY[id-1] + v*Tpoll*sin(ort*PI/180);
+}
+
+void initHuman() {
+    double dist_to_dest = pt_dist(startX[id-1], destX[id-1], startY[id-1], destY[id-1]);
+    ERR_PROF error_profile;
+    double dice = random(100.0);
+
+    if(dice&gt;50) {
+        startX[id-1] = 220.0;
+        startY[id-1] = 300.0;
+    } else {
+        startX[id-1] = 2000.0;
+        startY[id-1] = 300.0;
+    }
+
+    F = 0;
+    Fp = 0;
+    t = 0;
+    tUpd = 0;
+
+    v = fint(_v);
+
+    if(path==ND) {
+        humanPositionX[id - 1] = startX[id-1];
+        humanPositionY[id - 1] = startY[id-1];
+    } else if(path==1) {
+        humanPositionX[id - 1] = startX_alt1[id-1];
+        humanPositionY[id - 1] = startY_alt1[id-1];
+    } else {
+        humanPositionX[id - 1] = startX_alt2[id-1];
+        humanPositionY[id - 1] = startY_alt2[id-1];
+    }
+
+    internalHumX[id-1] = humanPositionX[id-1];
+    internalHumY[id-1] = humanPositionY[id-1];
+
+    secondDestX = destX[id-1];
+    secondDestY = destY[id-1];
+
+    if(p_f==1) {
+        lambda = YOUNG_HEALTHY[0]; mi = YOUNG_HEALTHY[1];
+    } else if(p_f==2) {
+        lambda = random_normal(YOUNG_SICK[0], YOUNG_SICK_SIGMA[0]);
+        mi = random_normal(YOUNG_SICK[1], YOUNG_SICK_SIGMA[1]);
+    } else if(p_f==3) {
+        lambda = random_normal(ELDERLY_HEALTHY[0], ELDERLY_HEALTHY_SIGMA[0]);
+        mi = random_normal(ELDERLY_HEALTHY[1], ELDERLY_HEALTHY_SIGMA[1]);
+    } else if(p_f==4) {
+        lambda = ELDERLY_SICK[0]; mi = ELDERLY_SICK[1];
+    } else if (p_f == 5)
+    {
+        lambda = YOUNG_UNSTEADY[0];
+        mi = YOUNG_UNSTEADY[1];
+    }
+    else if (p_f == 6)
+    {
+        lambda = ELDERLY_UNSTEADY[0];
+        mi = ELDERLY_UNSTEADY[1];
+    }
+    else {
+        lambda = 0.005; mi = 0.005; //default values
+    }
+
+    error_profile = get_error_params(p_fw);
+    obey = error_profile.obey;
+    disobey = error_profile.disobey;
+    freeWillTh = error_profile.FW_th;
+    TE = fint(dist_to_dest / v * (error_profile.delta_x100/100));
+    lambda_crit = 1/error_profile.lambda_inv;
+    hs = error_profile.crit;
+    crit = 1.0;
+    non_crit = 999.0;
+}
+
+double rob_dist_to_dest;
+double dist_to_dest;
+void checkFirst() {
+    int i;
+    rob_dist_to_dest = pt_dist(robPositionX[currR-1], destX[id-1], robPositionY[currR-1], destY[id-1]);
+    dist_to_dest = pt_dist(destX[id-1], internalHumX[id-1], destY[id-1], internalHumY[id-1]);
+    if(dist_to_dest &lt;= v*1.2){ //priority to human if parity
+        atDestHuman = true;
+        PATH = 2;
+
+        for(i=0; i&lt;H; i++) {
+            patterns[i] = patterns_alt2[i];
+            destX[i] = destX_alt2[i];
+            destY[i] = destY_alt2[i];
+        }
+
+        dX[currR-1] = secondDestX;
+        dY[currR-1] = secondDestY;
+    } else if(rob_dist_to_dest &lt;= v*1.2){
+        PATH = 1;
+
+        for(i=0; i&lt;H; i++) {
+            patterns[i] = patterns_alt1[i];
+            destX[i] = destX_alt1[i];
+            destY[i] = destY_alt1[i];
+        }
+
+        atDestRobot = true;
+        destX[currH-1] = secondDestX;
+        destY[currH-1] = secondDestY;
+        dX[currR-1] = secondDestX;
+        dY[currR-1] = secondDestY;
+    }
+}
+
+void checkSuccess(){
+    dist_to_dest = pt_dist(secondDestX, internalHumX[id-1], secondDestY, internalHumY[id-1]);
+    rob_dist_to_dest = pt_dist(robPositionX[currR-1], secondDestX, robPositionY[currR-1], secondDestY);
+    // when humans/robot reach their destination, they can be set as "served"
+    served[id-1] = (atDestHuman &amp;&amp; (dist_to_dest &lt;= v*2.0)) ||
+                (atDestRobot &amp;&amp; (rob_dist_to_dest &lt;= v*2.0));
+}
+    </declaration>
+		<location id="id17" x="-807" y="8">
+			<label kind="comments" x="-467" y="-340">assunzione per semplificare:
+            il primo che arriva è quello
+            capace di tornare indietro
+            con il componente per primo
+            (altrimenti dovrebbero esserci
+            dei passaggi tipo "staffetta")</label>
+			<committed/>
+		</location>
+		<location id="id18" x="-603" y="8" color="#0000ff">
+			<name x="-595" y="-25">idle</name>
+			<label kind="invariant" x="-595" y="-68">F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id19" x="-332" y="8">
+			<name x="-342" y="-26">c1</name>
+			<committed/>
+		</location>
+		<location id="id20" x="-43" y="8" color="#0000ff">
+			<name x="-25" y="-8">way_there</name>
+			<label kind="invariant" x="-25" y="8">F &lt;= F_max
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id21" x="-76" y="204">
+			<name x="-93" y="221">free_will_dec</name>
+			<committed/>
+		</location>
+		<location id="id22" x="-221" y="8">
+			<name x="-231" y="-26">c2</name>
+			<committed/>
+		</location>
+		<location id="id23" x="-42" y="-323" color="#ff0000">
+			<name x="-136" y="-314">failed</name>
+			<label kind="invariant" x="-136" y="-297">t' == 0 &amp;&amp;
+F' == 0</label>
+			<label kind="exponentialrate" x="-76" y="-332">1</label>
+		</location>
+		<location id="id24" x="272" y="178">
+			<committed/>
+		</location>
+		<location id="id25" x="272" y="119">
+			<committed/>
+		</location>
+		<location id="id26" x="272" y="8">
+			<name x="255" y="-26">checking</name>
+			<committed/>
+		</location>
+		<location id="id27" x="272" y="-170">
+			<committed/>
+		</location>
+		<location id="id28" x="-603" y="102">
+			<name x="-637" y="93">p1</name>
+			<committed/>
+		</location>
+		<location id="id29" x="-603" y="203">
+			<committed/>
+		</location>
+		<location id="id30" x="272" y="-323" color="#0000ff">
+			<name x="289" y="-323">way_back</name>
+			<label kind="invariant" x="289" y="-306">F &lt;= F_max
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id31" x="272" y="-247">
+			<committed/>
+		</location>
+		<location id="id32" x="501" y="-323">
+			<committed/>
+		</location>
+		<location id="id33" x="552" y="263" color="#0000ff">
+			<name x="569" y="246">wait_rob_dest1</name>
+			<label kind="invariant" x="569" y="263">F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id34" x="280" y="263">
+			<committed/>
+		</location>
+		<branchpoint id="id35" x="-281" y="8">
+		</branchpoint>
+		<init ref="id17"/>
+		<transition color="#ff0000">
+			<source ref="id20"/>
+			<target ref="id23"/>
+			<label kind="guard" x="-178" y="-153">tExp &gt;= TE &amp;&amp; !served[id-1]</label>
+			<nail x="-119" y="-136"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id18"/>
+			<target ref="id23"/>
+			<label kind="guard" x="-416" y="-170">tExp &gt;= TE &amp;&amp; !served[id-1]</label>
+		</transition>
+		<transition>
+			<source ref="id34"/>
+			<target ref="id33"/>
+			<label kind="guard" x="365" y="221">!served[id-1]</label>
+			<nail x="408" y="229"/>
+		</transition>
+		<transition>
+			<source ref="id34"/>
+			<target ref="id18"/>
+			<label kind="guard" x="-585" y="271">served[id-1]</label>
+			<label kind="synchronisation" x="-585" y="288">stop_r_action!</label>
+			<label kind="assignment" x="-586" y="255">tExp=0</label>
+			<nail x="-603" y="272"/>
+		</transition>
+		<transition>
+			<source ref="id33"/>
+			<target ref="id34"/>
+			<label kind="guard" x="365" y="272">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="280" y="289">checkSuccess(), tUpd=0, updateF(-mi, 0)</label>
+		</transition>
+		<transition>
+			<source ref="id27"/>
+			<target ref="id30"/>
+			<label kind="guard" x="144" y="-255">currH!=id</label>
+			<nail x="212" y="-246"/>
+		</transition>
+		<transition>
+			<source ref="id25"/>
+			<target ref="id20"/>
+			<label kind="guard" x="76" y="102">currH!=id</label>
+			<label kind="assignment" x="85" y="119">tExp=0</label>
+			<nail x="-42" y="119"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id26"/>
+			<target ref="id21"/>
+			<label kind="guard" x="51" y="212">fw&gt;=freeWillTh</label>
+			<nail x="272" y="204"/>
+		</transition>
+		<transition>
+			<source ref="id26"/>
+			<target ref="id33"/>
+			<label kind="guard" x="561" y="59">!atDestHuman &amp;&amp; atDestRobot</label>
+			<label kind="synchronisation" x="561" y="93">stop_h_action!</label>
+			<label kind="assignment" x="561" y="76">updateF(-lambda, 0)</label>
+			<nail x="552" y="8"/>
+		</transition>
+		<transition>
+			<source ref="id21"/>
+			<target ref="id18"/>
+			<label kind="assignment" x="-357" y="212">Fp=F, tUpd=0, t=0</label>
+			<nail x="-603" y="204"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id32"/>
+			<target ref="id18"/>
+			<label kind="guard" x="-467" y="-399">served[id-1] || fw&gt;=freeWillTh</label>
+			<label kind="synchronisation" x="-467" y="-382">stop_h_action!</label>
+			<label kind="assignment" x="-467" y="-365">hExe = 0, Fp = F</label>
+			<nail x="501" y="-399"/>
+			<nail x="-603" y="-399"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id32"/>
+			<target ref="id27"/>
+			<label kind="guard" x="510" y="-229">!served[id-1]  &amp;&amp; fw&lt;freeWillTh</label>
+			<label kind="assignment" x="510" y="-195">updateP(), updateF(-lambda, 1)</label>
+			<nail x="501" y="-170"/>
+		</transition>
+		<transition>
+			<source ref="id30"/>
+			<target ref="id32"/>
+			<label kind="guard" x="306" y="-383">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="306" y="-366">checkSuccess(),
+fw = random(FW_max)</label>
+		</transition>
+		<transition>
+			<source ref="id30"/>
+			<target ref="id23"/>
+			<label kind="guard" x="51" y="-374">F &gt;= F_max</label>
+			<label kind="synchronisation" x="51" y="-357">h_fail!</label>
+			<label kind="assignment" x="51" y="-340">t = 0, hExe = 0</label>
+		</transition>
+		<transition>
+			<source ref="id31"/>
+			<target ref="id30"/>
+			<label kind="synchronisation" x="170" y="-297">publish_m[3]!</label>
+			<label kind="assignment" x="144" y="-280">tUpd=0, tExp=0</label>
+		</transition>
+		<transition>
+			<source ref="id27"/>
+			<target ref="id31"/>
+			<label kind="guard" x="187" y="-229">currH==id</label>
+			<label kind="synchronisation" x="170" y="-212">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id26"/>
+			<target ref="id27"/>
+			<label kind="guard" x="280" y="-144">atDestHuman
+&amp;&amp; fw&lt;freeWillTh
+&amp;&amp; !atDestRobot</label>
+			<label kind="synchronisation" x="280" y="-93">stop_r_action!</label>
+			<label kind="assignment" x="280" y="-76">updateP(), updateF(-lambda, 1), plan_traj()</label>
+		</transition>
+		<transition>
+			<source ref="id29"/>
+			<target ref="id18"/>
+			<label kind="guard" x="-739" y="102">currH!=id</label>
+			<label kind="assignment" x="-731" y="119">tExp=0</label>
+			<nail x="-663" y="110"/>
+		</transition>
+		<transition>
+			<source ref="id28"/>
+			<target ref="id18"/>
+			<label kind="synchronisation" x="-629" y="50">publish_m[3]!</label>
+			<label kind="assignment" x="-629" y="68">tUpd=0</label>
+		</transition>
+		<transition>
+			<source ref="id29"/>
+			<target ref="id28"/>
+			<label kind="guard" x="-629" y="135">currH==id</label>
+			<label kind="synchronisation" x="-637" y="152">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id18"/>
+			<target ref="id29"/>
+			<label kind="guard" x="-527" y="102">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="-527" y="119">updateF(-mi, 0),
+tUpd=0,
+fw = random(FW_max)</label>
+			<nail x="-535" y="110"/>
+		</transition>
+		<transition>
+			<source ref="id26"/>
+			<target ref="id25"/>
+			<label kind="guard" x="280" y="25">!atDestHuman
+&amp;&amp; !atDestRobot
+&amp;&amp; fw&lt;freeWillTh</label>
+			<label kind="assignment" x="280" y="76">updateP(),
+            updateF(-lambda, 1)</label>
+		</transition>
+		<transition>
+			<source ref="id20"/>
+			<target ref="id26"/>
+			<label kind="guard" x="42" y="-85">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="42" y="-68">checkFirst(),
+fw = random(FW_max),
+tUpd=0, updateP(),
+updateF(-lambda, 1)</label>
+		</transition>
+		<transition>
+			<source ref="id21"/>
+			<target ref="id20"/>
+			<label kind="synchronisation" x="-178" y="93">stop_r_action!</label>
+			<label kind="assignment" x="-136" y="110">hExe=0</label>
+			<nail x="-76" y="76"/>
+		</transition>
+		<transition>
+			<source ref="id23"/>
+			<target ref="id23"/>
+			<nail x="-93" y="-374"/>
+			<nail x="-42" y="-374"/>
+		</transition>
+		<transition>
+			<source ref="id20"/>
+			<target ref="id23"/>
+			<label kind="guard" x="-34" y="-229">F &gt;= F_max</label>
+			<label kind="synchronisation" x="-34" y="-212">h_fail!</label>
+			<label kind="assignment" x="-34" y="-195">t = 0</label>
+		</transition>
+		<transition>
+			<source ref="id25"/>
+			<target ref="id24"/>
+			<label kind="guard" x="280" y="127">currH==id</label>
+			<label kind="synchronisation" x="280" y="144">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id24"/>
+			<target ref="id20"/>
+			<label kind="synchronisation" x="59" y="153">publish_m[3]!</label>
+			<nail x="-42" y="178"/>
+		</transition>
+		<transition>
+			<source ref="id22"/>
+			<target ref="id20"/>
+			<label kind="guard" x="-170" y="8">F==0</label>
+			<label kind="assignment" x="-170" y="25">Fp=1,
+            plan_traj()</label>
+		</transition>
+		<transition>
+			<source ref="id22"/>
+			<target ref="id20"/>
+			<label kind="guard" x="-170" y="-76">F&gt;0</label>
+			<label kind="assignment" x="-170" y="-59">Fp=1-F,
+            plan_traj()</label>
+			<nail x="-136" y="-25"/>
+		</transition>
+		<transition>
+			<source ref="id35"/>
+			<target ref="id22"/>
+			<label kind="probability" x="-272" y="8">obey</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id35"/>
+			<target ref="id18"/>
+			<label kind="probability" x="-476" y="68">disobey</label>
+			<nail x="-450" y="68"/>
+		</transition>
+		<transition>
+			<source ref="id19"/>
+			<target ref="id35"/>
+		</transition>
+		<transition>
+			<source ref="id18"/>
+			<target ref="id19"/>
+			<label kind="guard" x="-493" y="-25">currH==id</label>
+			<label kind="synchronisation" x="-501" y="-9">start_h_action?</label>
+		</transition>
+		<transition>
+			<source ref="id17"/>
+			<target ref="id18"/>
+			<label kind="assignment" x="-739" y="-8">initHuman()</label>
+		</transition>
+	</template>
+	<template>
+		<name>Human_Follower</name>
+		<parameter>int id, double _v, int p_f, int p_fw, int start_from, int path</parameter>
+		<declaration>clock t, F;
+clock tUpd;
+clock tExp;
+
+double Fp;
+double lambda, mi;
+const double passout_th = 1.0;
+
+// Errors Model
+int obey, disobey;
+double freeWillTh;
+double fw;
+int TE;
+double lambda_crit;
+double hs, crit, non_crit;
+
+void updateHealthDangerProb() {
+    if(scs) {
+        crit = 0.0;
+        non_crit = FS;
+        return;
+    }
+    crit = hs + hs * internalFatigue[id-1];
+    non_crit = FS - crit;
+}
+
+// Fatigue Sharing Parameters
+bool ONCE_FTG = true;
+bool ONCE_POS = true;
+
+meta int v;
+
+void updateF(double coeff, bool walking) {
+    // if two human instances are the same person,
+    // residual conditions must be retrieved
+    if (ONCE_FTG &amp;&amp; start_from!=-1 &amp;&amp; currH==id) {
+        F = internalFatigue[start_from-1];
+        Fp = F;
+        internalFatigue[id-1] = F;
+        ONCE_FTG = false;
+    }
+
+    if(walking) internalFatigue[id-1] = 1-(1-internalFatigue[id-1])*exp(coeff*Tpoll);
+    else internalFatigue[id-1] = internalFatigue[id-1]*exp(coeff*Tpoll);
+
+    internalFatigue[id-1] = fmax(0, internalFatigue[id-1]);
+}
+
+trajectory traj = {{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0}};
+double ort = 0.0;
+int curr_traj = 0;
+
+void change_orientation(double sx, double sy, double dx, double dy) {
+    double cos_alpha, alpha, theta, delta;
+    double AC, AB;
+    bool turnLeft, needsTurning = false;
+
+    AC = pt_dist(sx, dx, sy, sy);
+    AB = pt_dist(sx, dx, sy, dy);
+
+    if (AB == 0)
+    {
+        return;
+    }
+
+    cos_alpha = AC / AB;
+    // angle between destination and hor. line
+    alpha = acos(cos_alpha);
+    // angle between robot axis and hor. line
+    theta = ort * 180 / PI;
+    // how much the robot should rotate [deg]
+    delta = 0.0;
+    turnLeft = false;
+
+    if (dx &gt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 1st quadrant
+        alpha = alpha * (180 / PI);
+        if (alpha &gt; theta)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &gt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 2nd quadrant
+        alpha = -alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 3rd quadrant
+        alpha = -(180 - alpha * (180 / PI));
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 4th quadrant
+        alpha = 180 - alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+
+    needsTurning = delta &gt; 0.0;
+
+    if (needsTurning &amp;&amp; turnLeft)
+    {
+        ort = ort * 180 / PI + delta;
+    }
+    else if (needsTurning &amp;&amp; !turnLeft)
+    {
+        ort = ort * 180 / PI - delta;
+    }
+}
+
+point curr, dest;
+
+void plan_traj() {
+    int i, j, next_inters = -1;
+    int neigh[5] = {-1,-1,-1,-1,-1};
+    int k = 0;
+    double dist, min_dist;
+    bool visited[N_I] = {false,false,false,false,false,false,false,false,false};
+            curr[0] = internalHumX[id-1]; curr[1] = internalHumY[id-1];
+    dest[0] = destX[id-1]; dest[1] = destY[id-1];
+    // init trajectory
+    for (i = 0; i &lt; N_P; i++)
+    {
+        traj[i][0] = 0.0;
+        traj[i][1] = 0.0;
+    }
+    i = 0;
+    curr_traj = 0;
+
+    // builds trajectory by finding a path among adjacent areas
+    // (the existence of an intersection point means two areas are adjacent to each other)
+    // until the destination area is reached
+    while (!same_area(curr[0], curr[1], dest[0], dest[1]))
+    {
+        for (j = 0; j &lt; N_I &amp;&amp; k &lt; 5; j++)
+        {
+            // find all int. pts which are a neighbor of curr. point
+            // there are max. 3 in the long left hall
+            if (same_area(curr[0], curr[1], INTERSECTIONS[j][0], INTERSECTIONS[j][1]) &amp;&amp; !visited[j])
+            {
+                neigh[k] = j;
+                k++;
+            }
+        }
+        if(neigh[0]==-1) return;
+        // next int. point to add to traj. is the closest to destination
+        min_dist = pt_dist(INTERSECTIONS[neigh[0]][0], dest[0], INTERSECTIONS[neigh[0]][1], dest[1]);
+        next_inters = neigh[0];
+        for (j = 1; j &lt; 5 &amp;&amp; neigh[j] != -1; j++)
+        {
+            dist = pt_dist(INTERSECTIONS[neigh[j]][0], dest[0], INTERSECTIONS[neigh[j]][1], dest[1]);
+            if (dist &lt; min_dist)
+            {
+                min_dist = dist;
+                next_inters = neigh[j];
+            }
+        }
+        // if trajectory is full, or no next point has been found,
+        // something has gone wrong, but I cannot raise an exception
+        if (i == N_P - 1 || next_inters == -1)
+            return;
+        // next inters point is set as visited,
+        visited[next_inters] = true;
+        // added to the trajectory,
+        traj[i][0] = INTERSECTIONS[next_inters][0];
+        traj[i][1] = INTERSECTIONS[next_inters][1];
+        i++;
+        // and set as current point
+        curr[0] = INTERSECTIONS[next_inters][0];
+        curr[1] = INTERSECTIONS[next_inters][1];
+        // reset
+        next_inters = -1;
+        k = 0;
+        for(j=0; j&lt;5;j++) neigh[j] = -1;
+    }
+    // destination point is always part of the trajectory
+    traj[i][0] = dest[0];
+    traj[i][1] = dest[1];
+
+    //sets initial orientation
+    change_orientation(internalHumX[id-1], internalHumY[id-1], traj[0][0], traj[0][1]);
+}
+
+void updateP() {
+    double eps = 0.0;
+    // same as ONCE_FTG
+    if (ONCE_POS &amp;&amp; start_from!=-1) {
+        humanPositionX[id-1] = internalHumX[start_from-1];
+        humanPositionY[id-1] = internalHumY[start_from-1];
+        internalHumX[id-1] = humanPositionX[id-1];
+        internalHumY[id-1] = humanPositionY[id-1];
+        ONCE_POS = false;
+    }
+
+    if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+    return;
+
+    if (pt_dist(internalHumX[id-1], traj[curr_traj][0], internalHumY[id-1], traj[curr_traj][1]) &lt; v) {
+        curr_traj++;
+        if (curr_traj &gt;= N_P)
+        return;
+        change_orientation(internalHumX[id-1], internalHumY[id-1], traj[curr_traj][0], traj[curr_traj][1]);
+    }
+
+    internalHumX[id-1] = internalHumX[id-1] + v*Tpoll*cos(ort*PI/180);
+    internalHumY[id-1] = internalHumY[id-1] + v*Tpoll*sin(ort*PI/180);
+}
+
+void check_crit(){
+     double humanRobotDist = calculateDistance();
+     if(currH!=id || served[id-1]) return;
+     if(humanRobotDist&lt;=0.5) collisions++;
+
+     if(is_crit) v = fint(_v*0.6);
+     else v = fint(_v);
+}
+
+
+double crit_prob;
+void update_crit() {
+    double dice = random(100);
+    crit_prob = 1-exp(-lambda_crit*t);
+
+    if(dice&lt;=crit_prob*100) {
+        is_crit = false;
+        v = fint(_v);
+    }
+}
+
+void initHuman() {
+    double dist_to_dest = pt_dist(startX[id-1], destX[id-1], startY[id-1], destY[id-1]);
+    ERR_PROF error_profile;
+
+    t = 0;
+    tUpd = 0;
+    F = 0;
+    Fp = 0;
+    v = fint(_v);
+
+    if(path==ND) {
+        humanPositionX[id - 1] = startX[id-1];
+        humanPositionY[id - 1] = startY[id-1];
+    } else if(path==1) {
+        humanPositionX[id - 1] = startX_alt1[id-1];
+        humanPositionY[id - 1] = startY_alt1[id-1];
+    } else {
+        humanPositionX[id - 1] = startX_alt2[id-1];
+        humanPositionY[id - 1] = startY_alt2[id-1];
+    }
+    internalHumX[id-1] = humanPositionX[id-1];
+    internalHumY[id-1] = humanPositionY[id-1];
+
+    // unfortunately the switch case is not supported yet
+    if(p_f==1) {
+        lambda = YOUNG_HEALTHY[0]; mi = YOUNG_HEALTHY[1];
+    } else if(p_f==2) {
+        lambda = random_normal(YOUNG_SICK[0], YOUNG_SICK_SIGMA[0]);
+        mi = random_normal(YOUNG_SICK[1], YOUNG_SICK_SIGMA[1]);
+    } else if(p_f==3) {
+        lambda = random_normal(ELDERLY_HEALTHY[0], ELDERLY_HEALTHY_SIGMA[0]);
+        mi = random_normal(ELDERLY_HEALTHY[1], ELDERLY_HEALTHY_SIGMA[1]);
+    } else if(p_f==4) {
+        lambda = ELDERLY_SICK[0]; mi = ELDERLY_SICK[1];
+    } else if (p_f == 5) {
+        lambda = YOUNG_UNSTEADY[0];
+        mi = YOUNG_UNSTEADY[1];
+    } else if (p_f == 6) {
+        lambda = ELDERLY_UNSTEADY[0];
+        mi = ELDERLY_UNSTEADY[1];
+    }
+    else {
+        lambda = 0.005; mi = 0.005; //default values
+    }
+
+    error_profile = get_error_params(p_fw);
+    obey = error_profile.obey;
+    disobey = error_profile.disobey;
+    freeWillTh = error_profile.FW_th;
+    TE = fint(dist_to_dest / v * (error_profile.delta_x100/100));
+    lambda_crit = 1/error_profile.lambda_inv;
+    hs = error_profile.crit;
+    crit = 1.0;
+    non_crit = 999.0;
+}
+    </declaration>
+		<location id="id36" x="-390" y="-255">
+			<name x="-425" y="-246">idle</name>
+			<label kind="invariant" x="-450" y="-229">F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id37" x="221" y="-255">
+			<name x="213" y="-289">busy</name>
+			<label kind="invariant" x="212" y="-340">F &lt;= passout_th
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id38" x="-585" y="-254">
+			<name x="-628" y="-271">Init</name>
+			<committed/>
+		</location>
+		<location id="id39" x="374" y="-255" color="#ff0000">
+			<name x="391" y="-272">passed_out</name>
+			<label kind="invariant" x="391" y="-255">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="366" y="-238">1</label>
+		</location>
+		<location id="id40" x="-127" y="-357">
+			<name x="-137" y="-391">c1</name>
+			<committed/>
+		</location>
+		<location id="id41" x="43" y="-111">
+			<name x="51" y="-145">c3</name>
+			<committed/>
+		</location>
+		<location id="id42" x="60" y="-357">
+			<name x="50" y="-391">c2</name>
+			<committed/>
+		</location>
+		<location id="id43" x="-390" y="-476">
+			<name x="-400" y="-510">pub_1</name>
+			<committed/>
+		</location>
+		<location id="id44" x="221" y="-34">
+			<name x="211" y="-68">pub_3</name>
+			<committed/>
+		</location>
+		<location id="id45" x="-390" y="-366">
+			<name x="-400" y="-400">pub_2</name>
+			<committed/>
+		</location>
+		<location id="id46" x="221" y="-119">
+			<name x="211" y="-153">pub_4</name>
+			<committed/>
+		</location>
+		<location id="id47" x="501" y="42">
+			<committed/>
+		</location>
+		<location id="id48" x="-170" y="-552">
+			<committed/>
+		</location>
+		<location id="id49" x="-272" y="34">
+			<committed/>
+		</location>
+		<location id="id50" x="-127" y="34" color="#ff0000">
+			<label kind="invariant" x="-137" y="51">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="-102" y="25">1</label>
+		</location>
+		<branchpoint id="id51" x="221" y="42">
+		</branchpoint>
+		<branchpoint id="id52" x="-391" y="-552">
+		</branchpoint>
+		<branchpoint id="id53" x="-16" y="-111">
+		</branchpoint>
+		<branchpoint id="id54" x="-76" y="-357">
+		</branchpoint>
+		<init ref="id38"/>
+		<transition color="#ff0000">
+			<source ref="id51"/>
+			<target ref="id47"/>
+			<label kind="probability" x="348" y="42">crit</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id52"/>
+			<target ref="id48"/>
+			<label kind="probability" x="-306" y="-569">crit</label>
+		</transition>
+		<transition>
+			<source ref="id50"/>
+			<target ref="id50"/>
+			<nail x="-85" y="59"/>
+			<nail x="-85" y="8"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id37"/>
+			<target ref="id49"/>
+			<label kind="guard" x="-255" y="-280">tExp &gt;= TE &amp;&amp; !served[id-1]</label>
+			<nail x="-272" y="-255"/>
+		</transition>
+		<transition>
+			<source ref="id49"/>
+			<target ref="id50"/>
+			<label kind="synchronisation" x="-254" y="17">h_fail!</label>
+			<label kind="assignment" x="-254" y="34">tExp = 0</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id36"/>
+			<target ref="id49"/>
+			<label kind="guard" x="-527" y="-17">tExp &gt;= TE &amp;&amp; !served[id-1]</label>
+			<nail x="-391" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id48"/>
+			<target ref="id39"/>
+			<label kind="synchronisation" x="76" y="-544">h_fail!</label>
+			<nail x="374" y="-552"/>
+		</transition>
+		<transition>
+			<source ref="id47"/>
+			<target ref="id39"/>
+			<label kind="synchronisation" x="459" y="-136">h_fail!</label>
+			<nail x="501" y="-255"/>
+		</transition>
+		<transition>
+			<source ref="id37"/>
+			<target ref="id51"/>
+			<label kind="guard" x="314" y="-136">tUpd &gt;= Tpoll</label>
+			<label kind="assignment" x="297" y="-76">updateF(-lambda, 1),
+updateP(), tUpd=0,
+fw = random(FW_max),
+updateHealthDangerProb()</label>
+			<nail x="323" y="-110"/>
+		</transition>
+		<transition>
+			<source ref="id36"/>
+			<target ref="id52"/>
+			<label kind="guard" x="-629" y="-408">tUpd &gt;= Tpoll</label>
+			<label kind="assignment" x="-629" y="-391">updateF(-mi, 0),
+tUpd=0,
+fw = random(FW_max),
+updateHealthDangerProb()</label>
+			<nail x="-467" y="-408"/>
+		</transition>
+		<transition>
+			<source ref="id51"/>
+			<target ref="id44"/>
+			<label kind="probability" x="136" y="0">non_crit</label>
+		</transition>
+		<transition>
+			<source ref="id52"/>
+			<target ref="id43"/>
+			<label kind="probability" x="-382" y="-527">non_crit</label>
+		</transition>
+		<transition>
+			<source ref="id43"/>
+			<target ref="id36"/>
+			<label kind="guard" x="-339" y="-391">currH!=id</label>
+			<label kind="assignment" x="-340" y="-374">tExp=0</label>
+			<nail x="-339" y="-374"/>
+		</transition>
+		<transition>
+			<source ref="id46"/>
+			<target ref="id37"/>
+			<label kind="synchronisation" x="187" y="-170">publish_m[3]!</label>
+			<label kind="assignment" x="187" y="-204">check_crit(),
+update_crit()</label>
+		</transition>
+		<transition>
+			<source ref="id44"/>
+			<target ref="id46"/>
+			<label kind="synchronisation" x="170" y="-85">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id45"/>
+			<target ref="id36"/>
+			<label kind="synchronisation" x="-390" y="-327">publish_m[3]!</label>
+		</transition>
+		<transition>
+			<source ref="id43"/>
+			<target ref="id45"/>
+			<label kind="guard" x="-391" y="-442">currH==id</label>
+			<label kind="synchronisation" x="-390" y="-425">publish_m[2]!</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id36"/>
+			<target ref="id42"/>
+			<label kind="guard" x="-263" y="-459">!served[id-1] &amp;&amp; currH==id
+&amp;&amp; fw&gt;=freeWillTh
+&amp;&amp; !stopHuman</label>
+			<label kind="assignment" x="-76" y="-442">t = 0, tUpd=0,
+fw = 0, tExp=0</label>
+			<nail x="-263" y="-400"/>
+			<nail x="9" y="-400"/>
+		</transition>
+		<transition>
+			<source ref="id42"/>
+			<target ref="id37"/>
+			<label kind="guard" x="17" y="-289">F==0</label>
+			<label kind="assignment" x="17" y="-272">Fp=1,
+plan_traj()</label>
+			<nail x="60" y="-255"/>
+		</transition>
+		<transition>
+			<source ref="id42"/>
+			<target ref="id37"/>
+			<label kind="guard" x="77" y="-357">F&gt;0</label>
+			<label kind="assignment" x="68" y="-340">Fp=1-F,
+plan_traj()</label>
+			<nail x="128" y="-357"/>
+		</transition>
+		<transition>
+			<source ref="id54"/>
+			<target ref="id42"/>
+			<label kind="assignment" x="-59" y="-357">t = 0, tExp=0,
+tUpd=0</label>
+			<label kind="probability" x="-59" y="-374">obey</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id37"/>
+			<target ref="id36"/>
+			<label kind="guard" x="-297" y="-77">!served[id-1] &amp;&amp; currH==id
+&amp;&amp; fw&gt;=freeWillTh</label>
+			<label kind="assignment" x="-93" y="-77">t = 0, fw = 0,
+Fp = F, tUpd=0, tExp=0</label>
+			<nail x="119" y="-85"/>
+			<nail x="-305" y="-85"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id53"/>
+			<target ref="id37"/>
+			<label kind="probability" x="-16" y="-187">disobey</label>
+			<nail x="-16" y="-170"/>
+			<nail x="170" y="-170"/>
+		</transition>
+		<transition>
+			<source ref="id53"/>
+			<target ref="id36"/>
+			<label kind="assignment" x="-187" y="-212">t = 0, Fp=F,
+tUpd=0, tExp=0</label>
+			<label kind="probability" x="-229" y="-196">obey</label>
+			<nail x="-59" y="-170"/>
+			<nail x="-322" y="-170"/>
+		</transition>
+		<transition>
+			<source ref="id41"/>
+			<target ref="id53"/>
+		</transition>
+		<transition>
+			<source ref="id37"/>
+			<target ref="id41"/>
+			<label kind="synchronisation" x="51" y="-187">stop_h_action?</label>
+			<nail x="170" y="-170"/>
+			<nail x="43" y="-170"/>
+		</transition>
+		<transition>
+			<source ref="id36"/>
+			<target ref="id40"/>
+			<label kind="guard" x="-255" y="-391">currH==id</label>
+			<label kind="synchronisation" x="-255" y="-374">start_h_action?</label>
+			<nail x="-263" y="-357"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id54"/>
+			<target ref="id36"/>
+			<label kind="probability" x="-144" y="-323">disobey</label>
+			<nail x="-76" y="-323"/>
+			<nail x="-263" y="-323"/>
+		</transition>
+		<transition>
+			<source ref="id40"/>
+			<target ref="id54"/>
+		</transition>
+		<transition>
+			<source ref="id37"/>
+			<target ref="id39"/>
+			<label kind="guard" x="239" y="-272">F &gt;= passout_th</label>
+			<label kind="synchronisation" x="264" y="-255">h_fail!</label>
+			<label kind="assignment" x="315" y="-238">t = 0</label>
+		</transition>
+		<transition>
+			<source ref="id39"/>
+			<target ref="id39"/>
+			<nail x="349" y="-204"/>
+			<nail x="391" y="-204"/>
+		</transition>
+		<transition>
+			<source ref="id38"/>
+			<target ref="id36"/>
+			<label kind="assignment" x="-544" y="-246">initHuman()</label>
+		</transition>
+	</template>
+	<template>
+		<name>Human_Leader</name>
+		<parameter>int id, double _v, int p_f, int p_fw, int start_from, int path</parameter>
+		<declaration>clock t, F;
+clock tUpd;
+clock tExp;
+
+double Fp;
+double lambda, mi;
+const double passout_th = 1.0;
+
+// Errors Model
+int obey, disobey;
+double freeWillTh;
+double fw;
+int TE;
+double lambda_crit;
+double hs, crit, non_crit;
+
+// Fatigue Sharing Parameters
+bool DO_START = true;
+bool ONCE_FTG = true;
+bool ONCE_POS = true;
+
+int v;
+
+// Position Sharing Parameters
+bool access() {
+    return true;
+}
+
+void updateF(double coeff, bool walking) {
+    // if two human instances are the same person,
+    // residual conditions must be retrieved
+    if (ONCE_FTG &amp;&amp; start_from!=-1 &amp;&amp; currH==id) {
+        F = internalFatigue[start_from-1];
+        Fp = F;
+        internalFatigue[id-1] = F;
+        ONCE_FTG = false;
+    }
+
+    if(walking) {
+        internalFatigue[id-1] = 1-(1-internalFatigue[id-1])*exp(coeff*Tpoll);
+    } else {
+        internalFatigue[id-1] = internalFatigue[id-1]*exp(coeff*Tpoll);
+    }
+
+    internalFatigue[id-1] = fmax(0, internalFatigue[id-1]);
+}
+
+trajectory traj = {{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0}};
+double ort = 0.0;
+int curr_traj = 0;
+
+void change_orientation(double sx, double sy, double dx, double dy) {
+    double cos_alpha, alpha, theta, delta;
+    double AC, AB;
+    bool turnLeft, needsTurning = false;
+
+    AC = pt_dist(sx, dx, sy, sy);
+    AB = pt_dist(sx, dx, sy, dy);
+
+    if (AB == 0)
+    {
+        return;
+    }
+
+    cos_alpha = AC / AB;
+    // angle between destination and hor. line
+    alpha = acos(cos_alpha);
+    // angle between robot axis and hor. line
+    theta = ort * 180 / PI;
+    // how much the robot should rotate [deg]
+    delta = 0.0;
+    turnLeft = false;
+
+    if (dx &gt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 1st quadrant
+        alpha = alpha * (180 / PI);
+        if (alpha &gt; theta)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &gt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 2nd quadrant
+        alpha = -alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 3rd quadrant
+        alpha = -(180 - alpha * (180 / PI));
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 4th quadrant
+        alpha = 180 - alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+
+    needsTurning = delta &gt; 0.0;
+
+    if (needsTurning &amp;&amp; turnLeft)
+    {
+        ort = ort * 180 / PI + delta;
+    }
+    else if (needsTurning &amp;&amp; !turnLeft)
+    {
+        ort = ort * 180 / PI - delta;
+    }
+}
+
+point curr, dest;
+
+void plan_traj() {
+    int i, j, next_inters = -1;
+    int neigh[5] = {-1,-1,-1,-1,-1};
+    int k = 0;
+    double dist, min_dist;
+    bool visited[N_I] = {false,false,false,false,false,false,false,false,false};
+            curr[0] = internalHumX[id-1]; curr[1] = internalHumY[id-1];
+    dest[0] = destX[id-1]; dest[1] = destY[id-1];
+    // init trajectory
+    for (i = 0; i &lt; N_P; i++)
+    {
+        traj[i][0] = 0.0;
+        traj[i][1] = 0.0;
+    }
+    i = 0;
+    curr_traj = 0;
+
+    // builds trajectory by finding a path among adjacent areas
+    // (the existence of an intersection point means two areas are adjacent to each other)
+    // until the destination area is reached
+    while (!same_area(curr[0], curr[1], dest[0], dest[1]))
+    {
+        for (j = 0; j &lt; N_I; j++)
+        {
+            // find all int. pts which are a neighbor of curr. point
+            // there are max. 3 in the long left hall
+            if (same_area(curr[0], curr[1], INTERSECTIONS[j][0], INTERSECTIONS[j][1]) &amp;&amp; !visited[j])
+            {
+                neigh[k] = j;
+                k++;
+            }
+        }
+        if(neigh[0]==-1) return;
+        // next int. point to add to traj. is the closest to destination
+        min_dist = pt_dist(INTERSECTIONS[neigh[0]][0], dest[0], INTERSECTIONS[neigh[0]][1], dest[1]);
+        next_inters = neigh[0];
+        for (j = 1; j &lt; 5 &amp;&amp; neigh[j] != -1; j++)
+        {
+            dist = pt_dist(INTERSECTIONS[neigh[j]][0], dest[0], INTERSECTIONS[neigh[j]][1], dest[1]);
+            if (dist &lt; min_dist)
+            {
+                min_dist = dist;
+                next_inters = neigh[j];
+            }
+        }
+        // if trajectory is full, or no next point has been found,
+        // something has gone wrong, but I cannot raise an exception
+        if (i == N_P - 1 || next_inters == -1)
+            return;
+        // next inters point is set as visited,
+        visited[next_inters] = true;
+        // added to the trajectory,
+        traj[i][0] = INTERSECTIONS[next_inters][0];
+        traj[i][1] = INTERSECTIONS[next_inters][1];
+        i++;
+        // and set as current point
+        curr[0] = INTERSECTIONS[next_inters][0];
+        curr[1] = INTERSECTIONS[next_inters][1];
+        // reset
+        next_inters = -1;
+        k = 0;
+        for(j=0; j&lt;5;j++) neigh[j] = -1;
+    }
+    // destination point is always part of the trajectory
+    traj[i][0] = dest[0];
+    traj[i][1] = dest[1];
+
+    //sets initial orientation
+    change_orientation(internalHumX[id-1], internalHumY[id-1], traj[0][0], traj[0][1]);
+}
+
+void start_moving() {
+    // same as ONCE_FTG
+    if (ONCE_POS &amp;&amp; start_from!=-1) {
+        humanPositionX[id-1] = internalHumX[start_from-1];
+        humanPositionY[id-1] = internalHumY[start_from-1];
+        internalHumX[id-1] = humanPositionX[id-1];
+        internalHumY[id-1] = humanPositionY[id-1];
+        ONCE_POS = false;
+    }
+
+    F = 0;
+    t = 0;
+    tUpd=0;
+    hExe = 1;
+    fw=0;
+    plan_traj();
+    DO_START = false;
+}
+
+double dist_to_dest;
+double humanRobotDist;
+void checkSuccess() {
+    dist_to_dest = pt_dist(destX[id-1], internalHumX[id-1], destY[id-1], internalHumY[id-1]);
+    humanRobotDist = calculateDistance();
+    // when humans reach their destination, they can set themselves as "served"
+    if(dist_to_dest &lt;= v*3.0 &amp;&amp; humanRobotDist&lt;=5.0) {
+        served[id-1] = true;
+    }
+}
+
+void updateP() {
+    double eps = 0.0;
+
+    if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+    return;
+
+    if (pt_dist(internalHumX[id-1], traj[curr_traj][0], internalHumY[id-1], traj[curr_traj][1]) &lt; v) {
+        curr_traj++;
+        if (curr_traj &gt;= N_P)
+        return;
+        change_orientation(internalHumX[id-1], internalHumY[id-1], traj[curr_traj][0], traj[curr_traj][1]);
+    }
+
+    internalHumX[id-1] = internalHumX[id-1] + v*Tpoll*cos(ort*PI/180);
+    internalHumY[id-1] = internalHumY[id-1] + v*Tpoll*sin(ort*PI/180);
+}
+
+void check_crit(){
+     double humanRobotDist = calculateDistance();
+     if(currH!=id || served[id-1]) return;
+     if(humanRobotDist&lt;=0.5) collisions++;
+
+     if(is_crit) v = fint(_v*0.6);
+     else v = fint(_v);
+}
+
+double crit_prob;
+void update_crit() {
+    double dice = random(100);
+    crit_prob = 1-exp(-lambda_crit*t);
+
+    if(dice&lt;=crit_prob*100) {
+        is_crit = false;
+        v = fint(_v);
+    }
+}
+
+void initHuman() {
+    double dist_to_dest;
+    ERR_PROF error_profile;
+
+    F = 0;
+    Fp = 0;
+    t = 0;
+    v = fint(_v);
+
+    tUpd = 0;
+    if(path==ND) {
+        humanPositionX[id - 1] = startX[id-1];
+        humanPositionY[id - 1] = startY[id-1];
+        dist_to_dest = pt_dist(startX[id-1], destX[id-1], startY[id-1], destY[id-1]);
+    } else if(path==1) {
+        humanPositionX[id - 1] = startX_alt1[id-1];
+        humanPositionY[id - 1] = startY_alt1[id-1];
+        dist_to_dest = pt_dist(startX_alt1[id-1], destX_alt1[id-1], startY_alt1[id-1], destY_alt1[id-1]);
+    } else {
+        humanPositionX[id - 1] = startX_alt2[id-1];
+        humanPositionY[id - 1] = startY_alt2[id-1];
+        dist_to_dest = pt_dist(startX_alt2[id-1], destX_alt2[id-1], startY_alt2[id-1], destY_alt2[id-1]);
+    }
+
+    internalHumX[id-1] = humanPositionX[id-1];
+    internalHumY[id-1] = humanPositionY[id-1];
+
+    // unfortunately the switch case is not supported yet
+    if(p_f==1) {
+        lambda = YOUNG_HEALTHY[0]; mi = YOUNG_HEALTHY[1];
+    } else if(p_f==2) {
+        lambda = random_normal(YOUNG_SICK[0], YOUNG_SICK_SIGMA[0]);
+        mi = random_normal(YOUNG_SICK[1], YOUNG_SICK_SIGMA[1]);
+    } else if(p_f==3) {
+        lambda = random_normal(ELDERLY_HEALTHY[0], ELDERLY_HEALTHY_SIGMA[0]);
+        mi = random_normal(ELDERLY_HEALTHY[1], ELDERLY_HEALTHY_SIGMA[1]);
+    } else if(p_f==4) {
+        lambda = ELDERLY_SICK[0]; mi = ELDERLY_SICK[1];
+    } else if (p_f == 5)
+    {
+        lambda = YOUNG_UNSTEADY[0];
+        mi = YOUNG_UNSTEADY[1];
+    } else if (p_f == 6)
+    {
+        lambda = ELDERLY_UNSTEADY[0];
+        mi = ELDERLY_UNSTEADY[1];
+    } else {
+        lambda = 0.005; mi = 0.005; //default values
+    }
+
+    error_profile = get_error_params(p_fw);
+    obey = error_profile.obey;
+    disobey = error_profile.disobey;
+    freeWillTh = error_profile.FW_th;
+    if(_v&gt;50.0)
+        TE = fint(dist_to_dest / v * (error_profile.delta_x100/100));
+    else TE = 999;
+    lambda_crit = 1/error_profile.lambda_inv;
+    hs = error_profile.crit;
+    crit = 1.0;
+    non_crit = 999.0;
+}
+    </declaration>
+		<location id="id55" x="-476" y="-195">
+			<name x="-518" y="-144">idle</name>
+			<label kind="invariant" x="-518" y="-178">F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id56" x="254" y="-221">
+			<name x="263" y="-255">busy</name>
+			<label kind="invariant" x="263" y="-306">F &lt;= passout_th
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id57" x="-680" y="-195">
+			<name x="-723" y="-212">Init</name>
+			<committed/>
+		</location>
+		<location id="id58" x="425" y="-221" color="#ff0000">
+			<name x="442" y="-238">passed_out</name>
+			<label kind="invariant" x="442" y="-221">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="417" y="-204">1</label>
+		</location>
+		<location id="id59" x="255" y="-42">
+			<name x="272" y="-42">checking</name>
+			<committed/>
+		</location>
+		<location id="id60" x="-42" y="-272">
+			<name x="-52" y="-306">starting</name>
+			<urgent/>
+		</location>
+		<location id="id61" x="-603" y="-425">
+			<name x="-663" y="-434">pub_2</name>
+			<committed/>
+		</location>
+		<location id="id62" x="-476" y="-425">
+			<name x="-486" y="-459">pub_1</name>
+			<committed/>
+		</location>
+		<location id="id63" x="195" y="-170">
+			<name x="170" y="-204">pub_4</name>
+			<committed/>
+		</location>
+		<location id="id64" x="195" y="42">
+			<name x="170" y="59">pub_3</name>
+			<committed/>
+		</location>
+		<location id="id65" x="-246" y="-110">
+			<name x="-314" y="-136">stopping</name>
+			<label kind="invariant" x="-314" y="-153">tExp'==0</label>
+		</location>
+		<location id="id66" x="-246" y="68">
+			<name x="-297" y="85">timeout_detection</name>
+			<committed/>
+		</location>
+		<location id="id67" x="-26" y="68" color="#ff0000">
+			<name x="-36" y="34">timer_expired_state</name>
+			<label kind="invariant" x="-34" y="102">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="-34" y="85">1</label>
+		</location>
+		<location id="id68" x="449" y="-43" color="#ff0000">
+			<name x="459" y="-59">forbidden_area_state</name>
+			<label kind="invariant" x="442" y="-110">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="501" y="-25">1</label>
+		</location>
+		<init ref="id57"/>
+		<transition color="#ff0000">
+			<source ref="id61"/>
+			<target ref="id60"/>
+			<label kind="guard" x="-289" y="-510">!served[id-1]
+&amp;&amp; (fw&gt;=freeWillTh || DO_START)</label>
+			<label kind="synchronisation" x="-289" y="-527">start_h_action!</label>
+			<label kind="assignment" x="-289" y="-476">start_moving(), tExp=0</label>
+			<nail x="-603" y="-476"/>
+			<nail x="-187" y="-476"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id55"/>
+			<target ref="id60"/>
+			<label kind="guard" x="-442" y="-306">!served[id-1] &amp;&amp; currH == id
+&amp;&amp; fw&gt;=freeWillTh</label>
+			<label kind="synchronisation" x="-425" y="-272">start_h_action!</label>
+			<label kind="assignment" x="-425" y="-255">start_moving(), tExp=0</label>
+			<nail x="-476" y="-272"/>
+		</transition>
+		<transition>
+			<source ref="id59"/>
+			<target ref="id68"/>
+			<label kind="guard" x="273" y="-76">!access()</label>
+			<label kind="synchronisation" x="273" y="-59">h_fail!</label>
+			<label kind="assignment" x="272" y="-25">tExp = 0</label>
+		</transition>
+		<transition>
+			<source ref="id67"/>
+			<target ref="id67"/>
+			<nail x="34" y="102"/>
+			<nail x="34" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id66"/>
+			<target ref="id67"/>
+			<label kind="synchronisation" x="-161" y="68">h_fail!</label>
+			<label kind="assignment" x="-170" y="85">tExp = 0</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id56"/>
+			<target ref="id66"/>
+			<label kind="guard" x="-34" y="-204">tExp &gt;= TE
+&amp;&amp; !served[id-1]</label>
+			<nail x="93" y="-178"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id55"/>
+			<target ref="id66"/>
+			<label kind="guard" x="-527" y="68">tExp &gt;= TE &amp;&amp;
+!served[id-1]</label>
+			<nail x="-476" y="68"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id59"/>
+			<target ref="id65"/>
+			<label kind="guard" x="-178" y="-68">access() &amp;&amp;
+(served[id-1] ||
+fw&gt;=freeWillTh)</label>
+			<label kind="synchronisation" x="-34" y="-42">stop_h_action!</label>
+			<label kind="assignment" x="-34" y="-25">hExe = 0, Fp = F, tExp=0</label>
+			<nail x="-246" y="-42"/>
+		</transition>
+		<transition>
+			<source ref="id65"/>
+			<target ref="id55"/>
+			<label kind="synchronisation" x="-416" y="-127">r_still?</label>
+			<label kind="assignment" x="-416" y="-110">t = 0, tUpd=0,
+fw = random(FW_max)</label>
+			<nail x="-357" y="-110"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id56"/>
+			<target ref="id65"/>
+			<label kind="guard" x="-161" y="-161">!served[id-1] &amp;&amp;
+fw &gt;= freeWillTh &amp;&amp;
+tUpd&lt;=Tpoll</label>
+			<label kind="synchronisation" x="-161" y="-110">stop_h_action!</label>
+			<label kind="assignment" x="-161" y="-93">hExe = 0, Fp=F, tExp=0</label>
+			<nail x="255" y="-110"/>
+		</transition>
+		<transition>
+			<source ref="id62"/>
+			<target ref="id55"/>
+			<label kind="guard" x="-569" y="-314">currH!=id</label>
+			<label kind="assignment" x="-569" y="-340">tExp=0, fw=0</label>
+			<nail x="-535" y="-425"/>
+			<nail x="-535" y="-238"/>
+		</transition>
+		<transition>
+			<source ref="id63"/>
+			<target ref="id56"/>
+			<label kind="synchronisation" x="93" y="-153">publish_m[3]!</label>
+			<label kind="assignment" x="93" y="-136">tUpd=0, hExe=1,
+check_crit(),
+update_crit()</label>
+		</transition>
+		<transition>
+			<source ref="id64"/>
+			<target ref="id63"/>
+			<label kind="synchronisation" x="93" y="-8">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id59"/>
+			<target ref="id64"/>
+			<label kind="guard" x="263" y="17">!served[id-1] &amp;&amp;
+fw&lt;freeWillTh &amp;&amp;
+access()</label>
+			<label kind="assignment" x="263" y="68">updateP(), tExp=0,
+updateF(-lambda, 1),
+check_crit()</label>
+			<nail x="255" y="42"/>
+		</transition>
+		<transition>
+			<source ref="id61"/>
+			<target ref="id55"/>
+			<label kind="guard" x="-731" y="-391">fw&lt;freeWillTh
+&amp;&amp; !DO_START</label>
+			<label kind="synchronisation" x="-731" y="-340">publish_m[3]!</label>
+			<label kind="assignment" x="-731" y="-323">fw=0</label>
+			<nail x="-603" y="-238"/>
+		</transition>
+		<transition>
+			<source ref="id62"/>
+			<target ref="id61"/>
+			<label kind="guard" x="-586" y="-467">currH==id</label>
+			<label kind="synchronisation" x="-586" y="-450">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id55"/>
+			<target ref="id62"/>
+			<label kind="guard" x="-467" y="-408">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="-467" y="-391">updateF(-mi, 0),
+tUpd=0,
+fw = random(FW_max)</label>
+		</transition>
+		<transition>
+			<source ref="id60"/>
+			<target ref="id56"/>
+			<label kind="guard" x="34" y="-238">F==0</label>
+			<label kind="assignment" x="85" y="-238">Fp=1</label>
+			<nail x="-42" y="-221"/>
+		</transition>
+		<transition>
+			<source ref="id60"/>
+			<target ref="id56"/>
+			<label kind="guard" x="-17" y="-289">F&gt;0</label>
+			<label kind="assignment" x="17" y="-289">Fp=1-F</label>
+			<nail x="255" y="-272"/>
+		</transition>
+		<transition>
+			<source ref="id56"/>
+			<target ref="id59"/>
+			<label kind="guard" x="263" y="-153">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="263" y="-136">checkSuccess(),
+fw = random(FW_max)</label>
+		</transition>
+		<transition>
+			<source ref="id56"/>
+			<target ref="id58"/>
+			<label kind="guard" x="272" y="-238">F &gt;= passout_th</label>
+			<label kind="synchronisation" x="289" y="-221">h_fail!</label>
+			<label kind="assignment" x="289" y="-204">t = 0, hExe = 0</label>
+		</transition>
+		<transition>
+			<source ref="id58"/>
+			<target ref="id58"/>
+			<nail x="400" y="-170"/>
+			<nail x="442" y="-170"/>
+		</transition>
+		<transition>
+			<source ref="id57"/>
+			<target ref="id55"/>
+			<label kind="assignment" x="-654" y="-187">initHuman()</label>
+		</transition>
+		<transition>
+			<source ref="id68"/>
+			<target ref="id68"/>
+			<label kind="assignment" x="467" y="-17">tExp = 0</label>
+			<nail x="552" y="0"/>
+			<nail x="552" y="-42"/>
+		</transition>
+	</template>
+	<template>
+		<name>Human_Recipient</name>
+		<parameter>int id, double _v, int p_f, int p_fw, int path</parameter>
+		<declaration>clock t, F;
+clock tUpd;
+clock tExp;
+
+double Fp;
+double lambda, mi;
+const double passout_th = 1.0;
+
+// Errors Model
+int obey, disobey;
+double freeWillTh;
+double fw;
+int TE;
+double lambda_crit;
+double hs, crit, non_crit;
+
+meta int v;
+
+bool access() {
+    return true;
+}
+
+void updateF(double coeff, bool walking) {
+    if(walking) {
+        internalFatigue[id-1] = 1-(1-internalFatigue[id-1])*exp(coeff*Tpoll);
+    } else {
+        internalFatigue[id-1] = internalFatigue[id-1]*exp(coeff*Tpoll);
+    }
+
+    internalFatigue[id-1] = fmax(0, internalFatigue[id-1]);
+}
+
+trajectory traj = {{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0}};
+double ort = 0.0;
+int curr_traj = 0;
+
+void change_orientation(double sx, double sy, double dx, double dy) {
+    double cos_alpha, alpha, theta, delta;
+    double AC, AB;
+    bool turnLeft, needsTurning = false;
+
+    AC = pt_dist(sx, dx, sy, sy);
+    AB = pt_dist(sx, dx, sy, dy);
+
+    if (AB == 0)
+    {
+        return;
+    }
+
+    cos_alpha = AC / AB;
+    // angle between destination and hor. line
+    alpha = acos(cos_alpha);
+    // angle between robot axis and hor. line
+    theta = ort * 180 / PI;
+    // how much the robot should rotate [deg]
+    delta = 0.0;
+    turnLeft = false;
+
+    if (dx &gt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 1st quadrant
+        alpha = alpha * (180 / PI);
+        if (alpha &gt; theta)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &gt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 2nd quadrant
+        alpha = -alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 3rd quadrant
+        alpha = -(180 - alpha * (180 / PI));
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 4th quadrant
+        alpha = 180 - alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+
+    needsTurning = delta &gt; 0.0;
+
+    if (needsTurning &amp;&amp; turnLeft)
+    {
+        ort = ort * 180 / PI + delta;
+    }
+    else if (needsTurning &amp;&amp; !turnLeft)
+    {
+        ort = ort * 180 / PI - delta;
+    }
+}
+
+point curr, dest;
+
+void plan_traj() {
+    int i, j, next_inters = -1;
+    int neigh[5] = {-1,-1,-1,-1,-1};
+    int k = 0;
+    double dist, min_dist;
+    bool visited[N_I] = {false,false,false,false,false,false,false,false,false};
+            curr[0] = internalHumX[id-1]; curr[1] = internalHumY[id-1];
+    dest[0] = destX[id-1]; dest[1] = destY[id-1];
+    // init trajectory
+    for (i = 0; i &lt; N_P; i++)
+    {
+        traj[i][0] = 0.0;
+        traj[i][1] = 0.0;
+    }
+    i = 0;
+    curr_traj = 0;
+
+    // builds trajectory by finding a path among adjacent areas
+    // (the existence of an intersection point means two areas are adjacent to each other)
+    // until the destination area is reached
+    while (!same_area(curr[0], curr[1], dest[0], dest[1]))
+    {
+        for (j = 0; j &lt; N_I; j++)
+        {
+            // find all int. pts which are a neighbor of curr. point
+            // there are max. 3 in the long left hall
+            if (same_area(curr[0], curr[1], INTERSECTIONS[j][0], INTERSECTIONS[j][1]) &amp;&amp; !visited[j])
+            {
+                neigh[k] = j;
+                k++;
+            }
+        }
+        // next int. point to add to traj. is the closest to destination
+        min_dist = pt_dist(INTERSECTIONS[neigh[0]][0], dest[0], INTERSECTIONS[neigh[0]][1], dest[1]);
+        next_inters = neigh[0];
+        for (j = 1; j &lt; 5 &amp;&amp; neigh[j] != -1; j++)
+        {
+            dist = pt_dist(INTERSECTIONS[neigh[j]][0], dest[0], INTERSECTIONS[neigh[j]][1], dest[1]);
+            if (dist &lt; min_dist)
+            {
+                min_dist = dist;
+                next_inters = neigh[j];
+            }
+        }
+        // if trajectory is full, or no next point has been found,
+        // something has gone wrong, but I cannot raise an exception
+        if (i == N_P - 1 || next_inters == -1)
+            return;
+        // next inters point is set as visited,
+        visited[next_inters] = true;
+        // added to the trajectory,
+        traj[i][0] = INTERSECTIONS[next_inters][0];
+        traj[i][1] = INTERSECTIONS[next_inters][1];
+        i++;
+        // and set as current point
+        curr[0] = INTERSECTIONS[next_inters][0];
+        curr[1] = INTERSECTIONS[next_inters][1];
+        // reset
+        next_inters = -1;
+        k = 0;
+        for(j=0; j&lt;5;j++) neigh[j] = -1;
+    }
+    // destination point is always part of the trajectory
+    traj[i][0] = dest[0];
+    traj[i][1] = dest[1];
+
+    //sets initial orientation
+    change_orientation(internalHumX[id-1], internalHumY[id-1], traj[0][0], traj[0][1]);
+}
+
+void start_moving() {
+    F = 0;
+    t = 0;
+    tUpd=0;
+    hExe = 1;
+    plan_traj();
+}
+
+double dist_to_dest;
+void updateP() {
+    double eps = 0.0;
+
+    if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+    return;
+
+    if (pt_dist(internalHumX[id-1], traj[curr_traj][0], internalHumY[id-1], traj[curr_traj][1]) &lt; 20.0) {
+        curr_traj++;
+        if (curr_traj &gt;= N_P)
+        return;
+        change_orientation(internalHumX[id-1], internalHumY[id-1], traj[curr_traj][0], traj[curr_traj][1]);
+    }
+
+    internalHumX[id-1] = internalHumX[id-1] + v*Tpoll*cos(ort*PI/180);
+    internalHumY[id-1] = internalHumY[id-1] + v*Tpoll*sin(ort*PI/180);
+}
+
+void initHuman() {
+    double dist_to_dest = pt_dist(startX[id-1], destX[id-1], startY[id-1], destY[id-1]);
+    ERR_PROF error_profile;
+
+    F = 0;
+    Fp = 0;
+    t = 0;
+    v = fint(_v);
+
+    tUpd = 0;
+    if(path==ND) {
+        humanPositionX[id - 1] = startX[id-1];
+        humanPositionY[id - 1] = startY[id-1];
+    } else if(path==1) {
+        humanPositionX[id - 1] = startX_alt1[id-1];
+        humanPositionY[id - 1] = startY_alt1[id-1];
+    } else {
+        humanPositionX[id - 1] = startX_alt2[id-1];
+        humanPositionY[id - 1] = startY_alt2[id-1];
+    }
+
+    internalHumX[id-1] = humanPositionX[id-1];
+    internalHumY[id-1] = humanPositionY[id-1];
+
+    if(p_f==1) {
+        lambda = YOUNG_HEALTHY[0]; mi = YOUNG_HEALTHY[1];
+    } else if(p_f==2) {
+        lambda = random_normal(YOUNG_SICK[0], YOUNG_SICK_SIGMA[0]);
+        mi = random_normal(YOUNG_SICK[1], YOUNG_SICK_SIGMA[1]);
+    } else if(p_f==3) {
+        lambda = random_normal(ELDERLY_HEALTHY[0], ELDERLY_HEALTHY_SIGMA[0]);
+        mi = random_normal(ELDERLY_HEALTHY[1], ELDERLY_HEALTHY_SIGMA[1]);
+    } else if(p_f==4) {
+        lambda = ELDERLY_SICK[0]; mi = ELDERLY_SICK[1];
+    } else if (p_f == 5)
+    {
+        lambda = YOUNG_UNSTEADY[0];
+        mi = YOUNG_UNSTEADY[1];
+    }
+    else if (p_f == 6)
+    {
+        lambda = ELDERLY_UNSTEADY[0];
+        mi = ELDERLY_UNSTEADY[1];
+    } else {
+        lambda = 0.005; mi = 0.005; //default values
+    }
+
+    error_profile = get_error_params(p_fw);
+    obey = error_profile.obey;
+    disobey = error_profile.disobey;
+    freeWillTh = error_profile.FW_th;
+    TE = fint(dist_to_dest / v * (error_profile.delta_x100/100));
+    lambda_crit = 1/error_profile.lambda_inv;
+    hs = error_profile.crit;
+    crit = 1.0;
+    non_crit = 999.0;
+}
+    </declaration>
+		<location id="id69" x="-492" y="-399">
+			<name x="-526" y="-425">idle</name>
+			<label kind="invariant" x="-578" y="-459">F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id70" x="119" y="-399">
+			<name x="127" y="-442">busy_mov</name>
+			<label kind="invariant" x="127" y="-493">F &lt;= passout_th
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id71" x="-687" y="-398">
+			<name x="-730" y="-415">Init</name>
+			<committed/>
+		</location>
+		<location id="id72" x="272" y="-399" color="#ff0000">
+			<name x="289" y="-416">passed_out</name>
+			<label kind="invariant" x="289" y="-399">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="264" y="-382">1</label>
+		</location>
+		<location id="id73" x="-195" y="-569">
+			<name x="-187" y="-561">busy_rec</name>
+			<label kind="invariant" x="-187" y="-544">F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id74" x="-493" y="-246">
+			<name x="-476" y="-238">pub_1</name>
+			<committed/>
+		</location>
+		<location id="id75" x="-578" y="-246">
+			<name x="-638" y="-254">pub_2</name>
+			<committed/>
+		</location>
+		<location id="id76" x="119" y="-246">
+			<name x="102" y="-229">pub_5</name>
+			<committed/>
+		</location>
+		<location id="id77" x="119" y="-323">
+			<name x="59" y="-331">pub_6</name>
+			<committed/>
+		</location>
+		<location id="id78" x="-85" y="-714">
+			<name x="-95" y="-748">pub_4</name>
+			<committed/>
+		</location>
+		<location id="id79" x="-195" y="-714">
+			<name x="-205" y="-748">pub_3</name>
+			<committed/>
+		</location>
+		<location id="id80" x="-493" y="-688">
+			<name x="-476" y="-705">timeout_detection</name>
+			<committed/>
+		</location>
+		<location id="id81" x="-629" y="-688" color="#ff0000">
+			<name x="-639" y="-722">timer_expired_status</name>
+			<label kind="invariant" x="-637" y="-773">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="-646" y="-671">1</label>
+		</location>
+		<location id="id82" x="119" y="-569">
+			<committed/>
+		</location>
+		<location id="id83" x="119" y="-731" color="#ff0000">
+			<name x="145" y="-740">forbidden_area_status</name>
+			<label kind="invariant" x="144" y="-807">t' == 0 &amp;&amp;
+F' == 0 &amp;&amp;
+tExp'==0</label>
+			<label kind="exponentialrate" x="119" y="-783">1</label>
+		</location>
+		<init ref="id71"/>
+		<transition>
+			<source ref="id82"/>
+			<target ref="id83"/>
+			<label kind="guard" x="127" y="-671">!access()</label>
+			<label kind="synchronisation" x="127" y="-688">h_fail!</label>
+			<label kind="assignment" x="127" y="-654">tExp = 0</label>
+		</transition>
+		<transition>
+			<source ref="id82"/>
+			<target ref="id73"/>
+			<label kind="guard" x="-17" y="-595">access()</label>
+		</transition>
+		<transition>
+			<source ref="id70"/>
+			<target ref="id82"/>
+			<label kind="synchronisation" x="25" y="-501">start_h_action?</label>
+			<label kind="assignment" x="25" y="-552">t = 0, Fp = F,
+fw = 0, tUpd=0,
+tExp=0</label>
+		</transition>
+		<transition>
+			<source ref="id81"/>
+			<target ref="id81"/>
+			<nail x="-663" y="-714"/>
+			<nail x="-663" y="-671"/>
+		</transition>
+		<transition>
+			<source ref="id80"/>
+			<target ref="id81"/>
+			<label kind="synchronisation" x="-578" y="-705">h_fail!</label>
+			<label kind="assignment" x="-595" y="-688">tExp = 0</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id70"/>
+			<target ref="id80"/>
+			<label kind="guard" x="-127" y="-467">tExp &gt;= TE
+&amp;&amp; !served[id-1]</label>
+			<nail x="17" y="-399"/>
+			<nail x="17" y="-450"/>
+			<nail x="-212" y="-450"/>
+			<nail x="-212" y="-527"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id73"/>
+			<target ref="id80"/>
+			<label kind="guard" x="-475" y="-662">tExp &gt;= TE &amp;&amp;
+!served[id-1]</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id69"/>
+			<target ref="id80"/>
+			<label kind="guard" x="-629" y="-637">tExp &gt;= TE
+&amp;&amp; !served[id-1]</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id74"/>
+			<target ref="id70"/>
+			<label kind="guard" x="-178" y="-433">currH==id &amp;&amp;
+fw&gt;=freeWillTh</label>
+			<label kind="assignment" x="-178" y="-399">t = 0, Fp = 1-F,
+tUpd=0, fw = 0,
+plan_traj(), tExp=0</label>
+			<nail x="-187" y="-246"/>
+			<nail x="-187" y="-399"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id76"/>
+			<target ref="id69"/>
+			<label kind="guard" x="-178" y="-263">fw&gt;=freeWillTh</label>
+			<label kind="assignment" x="-178" y="-246">t = 0, Fp = F, fw = 0</label>
+			<nail x="-229" y="-246"/>
+			<nail x="-229" y="-399"/>
+		</transition>
+		<transition>
+			<source ref="id78"/>
+			<target ref="id73"/>
+			<label kind="synchronisation" x="-136" y="-663">publish_m[3]!</label>
+			<label kind="assignment" x="-136" y="-646">tUpd=0</label>
+			<nail x="-85" y="-569"/>
+		</transition>
+		<transition>
+			<source ref="id79"/>
+			<target ref="id78"/>
+			<label kind="guard" x="-178" y="-714">currH==id</label>
+			<label kind="synchronisation" x="-187" y="-697">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id73"/>
+			<target ref="id79"/>
+			<label kind="guard" x="-289" y="-663">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="-289" y="-646">updateF(-mi, 0),
+tUpd=0</label>
+		</transition>
+		<transition>
+			<source ref="id77"/>
+			<target ref="id70"/>
+			<label kind="synchronisation" x="17" y="-357">publish_m[3]!</label>
+			<label kind="assignment" x="59" y="-374">tUpd=0</label>
+		</transition>
+		<transition>
+			<source ref="id76"/>
+			<target ref="id77"/>
+			<label kind="guard" x="17" y="-306">fw&lt;freeWillTh</label>
+			<label kind="synchronisation" x="17" y="-272">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id70"/>
+			<target ref="id76"/>
+			<label kind="guard" x="204" y="-314">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="204" y="-297">updateF(-lambda, 1),
+updateP(), tUpd=0,
+fw = random(FW_max)</label>
+			<nail x="195" y="-399"/>
+			<nail x="195" y="-246"/>
+		</transition>
+		<transition>
+			<source ref="id75"/>
+			<target ref="id69"/>
+			<label kind="synchronisation" x="-671" y="-331">publish_m[3]!</label>
+			<label kind="assignment" x="-671" y="-314">tUpd=0</label>
+			<nail x="-578" y="-399"/>
+		</transition>
+		<transition>
+			<source ref="id74"/>
+			<target ref="id75"/>
+			<label kind="guard" x="-561" y="-289">currH==id &amp;&amp;
+fw&lt;freeWillTh</label>
+			<label kind="synchronisation" x="-561" y="-306">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id74"/>
+			<target ref="id69"/>
+			<label kind="guard" x="-544" y="-365">currH!=id</label>
+			<label kind="assignment" x="-544" y="-348">tExp=0</label>
+		</transition>
+		<transition>
+			<source ref="id69"/>
+			<target ref="id74"/>
+			<label kind="guard" x="-399" y="-357">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="-399" y="-340">updateF(-mi, 0), tUpd=0,
+fw = random(FW_max)</label>
+			<nail x="-408" y="-399"/>
+			<nail x="-408" y="-246"/>
+		</transition>
+		<transition>
+			<source ref="id73"/>
+			<target ref="id69"/>
+			<label kind="synchronisation" x="-459" y="-552">stop_h_action?</label>
+			<label kind="assignment" x="-459" y="-603">t = 0, Fp = F,
+fw = 0,
+tUpd=0</label>
+			<nail x="-467" y="-569"/>
+		</transition>
+		<transition>
+			<source ref="id69"/>
+			<target ref="id73"/>
+			<label kind="guard" x="-357" y="-518">currH==id</label>
+			<label kind="synchronisation" x="-357" y="-501">start_h_action?</label>
+			<label kind="assignment" x="-357" y="-484">F = 0, t = 0,
+tUpd=0</label>
+			<nail x="-365" y="-399"/>
+			<nail x="-365" y="-518"/>
+		</transition>
+		<transition>
+			<source ref="id70"/>
+			<target ref="id72"/>
+			<label kind="guard" x="137" y="-416">F &gt;= passout_th</label>
+			<label kind="synchronisation" x="204" y="-399">h_fail!</label>
+			<label kind="assignment" x="213" y="-382">t = 0</label>
+		</transition>
+		<transition>
+			<source ref="id72"/>
+			<target ref="id72"/>
+			<nail x="247" y="-348"/>
+			<nail x="289" y="-348"/>
+		</transition>
+		<transition>
+			<source ref="id71"/>
+			<target ref="id69"/>
+			<label kind="assignment" x="-671" y="-416">initHuman()</label>
+		</transition>
+		<transition>
+			<source ref="id83"/>
+			<target ref="id83"/>
+			<nail x="145" y="-791"/>
+			<nail x="102" y="-791"/>
+		</transition>
+	</template>
+	<template>
+		<name>Human_Rescuer</name>
+		<parameter>int id, double _v, int p_f, int p_fw, int p_dext, int path</parameter>
+		<declaration>//PATTERN N°10
+clock t, F;
+clock tUpd;
+clock tExp;
+
+double Fp;
+double lambda, mi;
+
+// Errors Model
+int obey, disobey;
+double freeWillTh;
+double fw;
+int TE;
+double lambda_crit;
+double hs, crit, non_crit;
+
+
+bool nearRobot = false;
+
+void updateF(double coeff, bool walking) {
+    if(walking) {
+        internalFatigue[id-1] = 1-(1-internalFatigue[id-1])*exp(coeff*Tpoll);
+    } else {
+        internalFatigue[id-1] = internalFatigue[id-1]*exp(coeff*Tpoll);
+    }
+
+    internalFatigue[id-1] = fmax(0, internalFatigue[id-1]);
+}
+
+trajectory traj = {{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0}};
+double ort = 0.0;
+int curr_traj = 0;
+
+void change_orientation(double sx, double sy, double dx, double dy) {
+    double cos_alpha, alpha, theta, delta;
+    double AC, AB;
+    bool turnLeft, needsTurning = false;
+
+    AC = pt_dist(sx, dx, sy, sy);
+    AB = pt_dist(sx, dx, sy, dy);
+
+    if (AB == 0)
+    {
+        return;
+    }
+
+    cos_alpha = AC / AB;
+    // angle between destination and hor. line
+    alpha = acos(cos_alpha);
+    // angle between robot axis and hor. line
+    theta = ort * 180 / PI;
+    // how much the robot should rotate [deg]
+    delta = 0.0;
+    turnLeft = false;
+
+    if (dx &gt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 1st quadrant
+        alpha = alpha * (180 / PI);
+        if (alpha &gt; theta)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &gt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 2nd quadrant
+        alpha = -alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &lt;= sy)
+    { // Destination in 3rd quadrant
+        alpha = -(180 - alpha * (180 / PI));
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+    else if (dx &lt;= sx &amp;&amp; dy &gt;= sy)
+    { // Destination in 4th quadrant
+        alpha = 180 - alpha * (180 / PI);
+        if (theta &lt; alpha)
+        {
+            delta = alpha - theta;
+            turnLeft = true;
+        }
+        else
+        {
+            delta = theta - alpha;
+            turnLeft = false;
+        }
+    }
+
+    needsTurning = delta &gt; 0.0;
+
+    if (needsTurning &amp;&amp; turnLeft)
+    {
+        ort = ort * 180 / PI + delta;
+    }
+    else if (needsTurning &amp;&amp; !turnLeft)
+    {
+        ort = ort * 180 / PI - delta;
+    }
+}
+
+point curr, dest;
+
+void plan_traj() {
+    int i, j, next_inters = -1;
+    int neigh[5] = {-1,-1,-1,-1,-1};
+    int k = 0;
+    double dist, min_dist;
+    bool visited[N_I] = {false,false,false,false,false,false,false,false,false};
+            curr[0] = internalHumX[id-1]; curr[1] = internalHumY[id-1];
+    dest[0] = destX[id-1]; dest[1] = destY[id-1];
+    // init trajectory
+    for (i = 0; i &lt; N_P; i++)
+    {
+        traj[i][0] = 0.0;
+        traj[i][1] = 0.0;
+    }
+    i = 0;
+    curr_traj = 0;
+
+    // builds trajectory by finding a path among adjacent areas
+    // (the existence of an intersection point means two areas are adjacent to each other)
+    // until the destination area is reached
+    while (!same_area(curr[0], curr[1], dest[0], dest[1]))
+    {
+        for (j = 0; j &lt; N_I; j++)
+        {
+            // find all int. pts which are a neighbor of curr. point
+            // there are max. 3 in the long left hall
+            if (same_area(curr[0], curr[1], INTERSECTIONS[j][0], INTERSECTIONS[j][1]) &amp;&amp; !visited[j])
+            {
+                neigh[k] = j;
+                k++;
+            }
+        }
+        // next int. point to add to traj. is the closest to destination
+        min_dist = pt_dist(INTERSECTIONS[neigh[0]][0], dest[0], INTERSECTIONS[neigh[0]][1], dest[1]);
+        next_inters = neigh[0];
+        for (j = 1; j &lt; 5 &amp;&amp; neigh[j] != -1; j++)
+        {
+            dist = pt_dist(INTERSECTIONS[neigh[j]][0], dest[0], INTERSECTIONS[neigh[j]][1], dest[1]);
+            if (dist &lt; min_dist)
+            {
+                min_dist = dist;
+                next_inters = neigh[j];
+            }
+        }
+        // if trajectory is full, or no next point has been found,
+        // something has gone wrong, but I cannot raise an exception
+        if (i == N_P - 1 || next_inters == -1)
+            return;
+        // next inters point is set as visited,
+        visited[next_inters] = true;
+        // added to the trajectory,
+        traj[i][0] = INTERSECTIONS[next_inters][0];
+        traj[i][1] = INTERSECTIONS[next_inters][1];
+        i++;
+        // and set as current point
+        curr[0] = INTERSECTIONS[next_inters][0];
+        curr[1] = INTERSECTIONS[next_inters][1];
+        // reset
+        next_inters = -1;
+        k = 0;
+        for(j=0; j&lt;5;j++) neigh[j] = -1;
+    }
+    // destination point is always part of the trajectory
+    traj[i][0] = dest[0];
+    traj[i][1] = dest[1];
+
+    //sets initial orientation
+    change_orientation(internalHumX[id-1], internalHumY[id-1], traj[0][0], traj[0][1]);
+}
+
+
+double dist_to_dest;
+meta int v;
+
+void updateP(){
+    double eps = 0.0;
+
+    if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+    return;
+
+    if (pt_dist(internalHumX[id-1], traj[curr_traj][0], internalHumY[id-1], traj[curr_traj][1]) &lt; v) {
+        curr_traj++;
+        if (curr_traj &gt;= N_P)
+        return;
+        change_orientation(internalHumX[id-1], internalHumY[id-1], traj[curr_traj][0], traj[curr_traj][1]);
+    }
+
+    internalHumX[id-1] = internalHumX[id-1] + v*Tpoll*cos(ort*PI/180);
+    internalHumY[id-1] = internalHumY[id-1] + v*Tpoll*sin(ort*PI/180);
+}
+
+void initHuman() {
+    double dist_to_dest = pt_dist(startX[id-1], destX[id-1], startY[id-1], destY[id-1]);
+    ERR_PROF error_profile;
+
+    F = 0;
+    Fp = 0;
+    t = 0;
+    tUpd = 0;
+
+    v = fint(_v);
+
+    if(path==ND) {
+        humanPositionX[id - 1] = startX[id-1];
+        humanPositionY[id - 1] = startY[id-1];
+    } else if(path==1) {
+        humanPositionX[id - 1] = startX_alt1[id-1];
+        humanPositionY[id - 1] = startY_alt1[id-1];
+    } else {
+        humanPositionX[id - 1] = startX_alt2[id-1];
+        humanPositionY[id - 1] = startY_alt2[id-1];
+    }
+
+    internalHumX[id-1] = humanPositionX[id-1];
+    internalHumY[id-1] = humanPositionY[id-1];
+
+    dext = p_dext;
+    task_completion = 0;
+
+    if(p_f==1) {
+        lambda = YOUNG_HEALTHY[0]; mi = YOUNG_HEALTHY[1];
+    } else if(p_f==2) {
+        lambda = random_normal(YOUNG_SICK[0], YOUNG_SICK_SIGMA[0]);
+        mi = random_normal(YOUNG_SICK[1], YOUNG_SICK_SIGMA[1]);
+    } else if(p_f==3) {
+        lambda = random_normal(ELDERLY_HEALTHY[0], ELDERLY_HEALTHY_SIGMA[0]);
+        mi = random_normal(ELDERLY_HEALTHY[1], ELDERLY_HEALTHY_SIGMA[1]);
+    } else if(p_f==4) {
+        lambda = ELDERLY_SICK[0]; mi = ELDERLY_SICK[1];
+    } else if (p_f == 5)
+    {
+        lambda = YOUNG_UNSTEADY[0];
+        mi = YOUNG_UNSTEADY[1];
+    }
+    else if (p_f == 6)
+    {
+        lambda = ELDERLY_UNSTEADY[0];
+        mi = ELDERLY_UNSTEADY[1];
+    }
+	else {
+        lambda = 0.005; mi = 0.005; //default values
+    }
+
+    error_profile = get_error_params(p_fw);
+    obey = error_profile.obey;
+    disobey = error_profile.disobey;
+    freeWillTh = error_profile.FW_th;
+    if(dist_to_dest&lt;1.0) TE = 999;
+    else TE = fint(dist_to_dest / v * (error_profile.delta_x100/100));
+    lambda_crit = 1/error_profile.lambda_inv;
+    hs = error_profile.crit;
+    crit = 1.0;
+    non_crit = 999.0;
+}
+
+void updateT(){
+    task_completion += dext * (random(1)&gt;=0.5);
+}
+
+void checkRobot(){
+    nearRobot = calculateDistance() &lt;= _v/100.0*2.0;
+}
+    </declaration>
+		<location id="id84" x="-595" y="17">
+			<name x="-605" y="-17">Init</name>
+			<committed/>
+		</location>
+		<location id="id85" x="-391" y="204">
+			<name x="-391" y="213">c1</name>
+			<committed/>
+		</location>
+		<location id="id86" x="204" y="17" color="#0000ff">
+			<name x="212" y="-8">exec</name>
+			<label kind="invariant" x="212" y="25">F &lt;= F_max &amp;&amp; tExp'==0
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id87" x="-391" y="17" color="#0000ff">
+			<name x="-425" y="25">idle</name>
+			<label kind="invariant" x="-510" y="42">F' == -Fp*mi*exp(-mi*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id88" x="-391" y="-68">
+			<committed/>
+		</location>
+		<location id="id89" x="-391" y="-221">
+			<committed/>
+		</location>
+		<location id="id90" x="204" y="-153">
+			<name x="194" y="-187">checking</name>
+			<committed/>
+		</location>
+		<location id="id91" x="450" y="-153">
+			<committed/>
+		</location>
+		<location id="id92" x="450" y="17">
+			<committed/>
+		</location>
+		<location id="id93" x="-34" y="204">
+			<name x="-44" y="170">c2</name>
+			<committed/>
+		</location>
+		<location id="id94" x="17" y="-34">
+			<committed/>
+		</location>
+		<location id="id95" x="204" y="204" color="#0000ff">
+			<name x="194" y="170">moving</name>
+			<label kind="invariant" x="195" y="229">F &lt;= F_max
+&amp;&amp; F' == Fp*lambda*exp(-lambda*t)
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		</location>
+		<location id="id96" x="433" y="255">
+			<name x="423" y="221">c3</name>
+			<committed/>
+		</location>
+		<location id="id97" x="663" y="204">
+			<name x="671" y="221">checking_2</name>
+			<committed/>
+		</location>
+		<location id="id98" x="799" y="17" color="#ff0000">
+			<name x="807" y="25">passed_out</name>
+			<label kind="invariant" x="807" y="42">t' == 0 &amp;&amp;
+F' == 0</label>
+			<label kind="exponentialrate" x="782" y="-17">1</label>
+		</location>
+		<location id="id99" x="204" y="476">
+			<committed/>
+		</location>
+		<branchpoint id="id101" x="-391" y="476">
+		</branchpoint>
+		<branchpoint id="id102" x="17" y="17">
+		</branchpoint>
+		<branchpoint id="id103" x="-102" y="204">
+		</branchpoint>
+		<init ref="id84"/>
+		<transition color="#ff0000">
+			<source ref="id95"/>
+			<target ref="id98"/>
+			<label kind="guard" x="578" y="68">tExp &gt;= TE &amp;&amp; !served[id-1]</label>
+			<nail x="714" y="68"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id87"/>
+			<target ref="id98"/>
+			<label kind="guard" x="-484" y="-272">tExp &gt;= TE &amp;&amp; !served[id-1]</label>
+			<nail x="-493" y="-76"/>
+			<nail x="-493" y="-280"/>
+			<nail x="535" y="-280"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id90"/>
+			<target ref="id86"/>
+			<label kind="guard" x="323" y="-136">currH!=id &amp;&amp;
+!served[id-1] &amp;&amp;
+fw&lt;freeWillTh</label>
+			<label kind="assignment" x="323" y="-85">tUpd=0</label>
+			<nail x="323" y="-153"/>
+			<nail x="323" y="-42"/>
+		</transition>
+		<transition>
+			<source ref="id97"/>
+			<target ref="id95"/>
+			<label kind="guard" x="382" y="161">currH!=id &amp;&amp;
+fw&lt;freeWillTh</label>
+			<label kind="assignment" x="408" y="187">tExp=0</label>
+			<nail x="433" y="187"/>
+		</transition>
+		<transition>
+			<source ref="id90"/>
+			<target ref="id87"/>
+			<label kind="guard" x="-8" y="-212">served[id-1]</label>
+			<label kind="assignment" x="-8" y="-195">hExe = 0, Fp = F,
+tUpd=0, t = 0</label>
+			<nail x="-34" y="-153"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id89"/>
+			<target ref="id93"/>
+			<label kind="guard" x="-272" y="-280">currH==id
+&amp;&amp; fw&gt;=freeWillTh
+&amp;&amp; task_completion &lt; task_size</label>
+			<label kind="assignment" x="-373" y="-221">fw=0</label>
+			<nail x="-34" y="-221"/>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id97"/>
+			<target ref="id87"/>
+			<label kind="guard" x="357" y="348">fw&gt;=freeWillTh</label>
+			<label kind="assignment" x="357" y="365">hExe=0, t = 0,
+Fp=F, tUpd=0</label>
+			<nail x="663" y="365"/>
+			<nail x="-391" y="365"/>
+		</transition>
+		<transition>
+			<source ref="id95"/>
+			<target ref="id86"/>
+			<label kind="guard" x="127" y="76">nearRobot</label>
+			<label kind="assignment" x="127" y="93">t = 0, tUpd=0,
+Fp=F, fw=0</label>
+			<label kind="comments" x="484" y="-161">//errore se metto &amp;&amp; freeWill&lt;=freeWillTh.
+            general hybrid guard without urgent channel</label>
+		</transition>
+		<transition>
+			<source ref="id86"/>
+			<target ref="id98"/>
+			<label kind="guard" x="535" y="17">F &gt;= F_max</label>
+			<label kind="synchronisation" x="535" y="34">h_fail!</label>
+			<label kind="assignment" x="535" y="51">t=0</label>
+		</transition>
+		<transition>
+			<source ref="id101"/>
+			<target ref="id87"/>
+			<label kind="assignment" x="-518" y="416">t = 0, Fp=F,
+tUpd=0, hExe=0</label>
+			<label kind="probability" x="-518" y="399">obey</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id101"/>
+			<target ref="id95"/>
+			<label kind="probability" x="-59" y="382">disobey</label>
+		</transition>
+		<transition>
+			<source ref="id99"/>
+			<target ref="id101"/>
+		</transition>
+		<transition>
+			<source ref="id95"/>
+			<target ref="id99"/>
+			<label kind="synchronisation" x="170" y="399">stop_h_action?</label>
+		</transition>
+		<transition>
+			<source ref="id98"/>
+			<target ref="id98"/>
+			<nail x="841" y="-8"/>
+			<nail x="841" y="17"/>
+		</transition>
+		<transition>
+			<source ref="id95"/>
+			<target ref="id98"/>
+			<label kind="guard" x="807" y="127">F &gt;= F_max</label>
+			<label kind="synchronisation" x="807" y="144">h_fail!</label>
+			<label kind="assignment" x="807" y="161">t = 0</label>
+			<nail x="799" y="204"/>
+		</transition>
+		<transition>
+			<source ref="id96"/>
+			<target ref="id95"/>
+			<label kind="synchronisation" x="289" y="221">publish_m[3]!</label>
+		</transition>
+		<transition>
+			<source ref="id97"/>
+			<target ref="id96"/>
+			<label kind="guard" x="484" y="221">currH==id &amp;&amp;
+fw&lt;freeWillTh</label>
+			<label kind="synchronisation" x="484" y="255">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id95"/>
+			<target ref="id97"/>
+			<label kind="guard" x="331" y="127">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="433" y="110">updateF(-lambda, 1), checkRobot(),
+updateP(), tUpd=0, fw = random(FW_max)</label>
+			<nail x="433" y="144"/>
+		</transition>
+		<transition>
+			<source ref="id93"/>
+			<target ref="id95"/>
+			<label kind="guard" x="59" y="136">F==0</label>
+			<label kind="assignment" x="-8" y="153">Fp=1, plan_traj(), hExe = 1</label>
+			<nail x="76" y="153"/>
+		</transition>
+		<transition>
+			<source ref="id93"/>
+			<target ref="id95"/>
+			<label kind="guard" x="59" y="204">F&gt;0</label>
+			<label kind="assignment" x="-17" y="221">Fp=1-F, plan_traj(), hExe = 1</label>
+		</transition>
+		<transition>
+			<source ref="id102"/>
+			<target ref="id87"/>
+			<label kind="assignment" x="-127" y="17">t = 0, Fp=F,
+tUpd=0, hExe=0</label>
+			<label kind="probability" x="-136" y="0">obey</label>
+		</transition>
+		<transition>
+			<source ref="id102"/>
+			<target ref="id86"/>
+			<label kind="probability" x="76" y="0">disobey</label>
+		</transition>
+		<transition>
+			<source ref="id94"/>
+			<target ref="id102"/>
+		</transition>
+		<transition>
+			<source ref="id86"/>
+			<target ref="id94"/>
+			<label kind="synchronisation" x="76" y="-34">stop_h_action?</label>
+			<nail x="204" y="-34"/>
+		</transition>
+		<transition>
+			<source ref="id103"/>
+			<target ref="id93"/>
+			<label kind="probability" x="-93" y="136">obey</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id90"/>
+			<target ref="id87"/>
+			<label kind="guard" x="-144" y="-102">fw&gt;=freeWillTh
+&amp;&amp; !served[id-1]</label>
+			<label kind="assignment" x="-221" y="-51">hExe = 0, Fp = F,
+tUpd=0, t = 0,
+fw=0</label>
+			<label kind="comments" x="68" y="-263">human autonomously decides to leave --&gt; insuccess</label>
+		</transition>
+		<transition>
+			<source ref="id92"/>
+			<target ref="id86"/>
+			<label kind="synchronisation" x="263" y="-17">publish_m[3]!</label>
+			<label kind="assignment" x="263" y="0">tUpd=0</label>
+		</transition>
+		<transition>
+			<source ref="id91"/>
+			<target ref="id92"/>
+			<label kind="synchronisation" x="425" y="-42">publish_m[2]!</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id90"/>
+			<target ref="id91"/>
+			<label kind="guard" x="272" y="-238">currH==id &amp;&amp;
+!served[id-1] &amp;&amp;
+fw&lt;freeWillTh</label>
+			<label kind="assignment" x="272" y="-187">updateT(),
+            updateF(-lambda, 1)</label>
+		</transition>
+		<transition>
+			<source ref="id86"/>
+			<target ref="id90"/>
+			<label kind="guard" x="204" y="-119">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="76" y="-85">fw = random(FW_max)</label>
+		</transition>
+		<transition color="#ff0000">
+			<source ref="id103"/>
+			<target ref="id87"/>
+			<label kind="probability" x="-357" y="51">disobey</label>
+		</transition>
+		<transition>
+			<source ref="id85"/>
+			<target ref="id103"/>
+		</transition>
+		<transition>
+			<source ref="id89"/>
+			<target ref="id88"/>
+			<label kind="guard" x="-399" y="-170">currH==id
+&amp;&amp; fw&lt;=freeWillTh</label>
+			<label kind="synchronisation" x="-391" y="-119">publish_m[2]!</label>
+		</transition>
+		<transition>
+			<source ref="id88"/>
+			<target ref="id87"/>
+			<label kind="synchronisation" x="-425" y="-51">publish_m[3]!</label>
+		</transition>
+		<transition>
+			<source ref="id89"/>
+			<target ref="id87"/>
+			<label kind="guard" x="-382" y="-187">currH!=id || served[id-1]</label>
+			<label kind="assignment" x="-314" y="-170">tExp=0</label>
+			<nail x="-306" y="-102"/>
+		</transition>
+		<transition>
+			<source ref="id87"/>
+			<target ref="id89"/>
+			<label kind="guard" x="-527" y="-153">tUpd&gt;=Tpoll</label>
+			<label kind="assignment" x="-527" y="-136">updateF(-mi, 0), tUpd=0,
+fw = random(FW_max)</label>
+			<nail x="-459" y="-85"/>
+		</transition>
+		<transition>
+			<source ref="id87"/>
+			<target ref="id85"/>
+			<label kind="guard" x="-476" y="144">currH==id</label>
+			<label kind="synchronisation" x="-501" y="161">start_h_action?</label>
+			<label kind="comments" x="-612" y="127">The human "notices" the robot</label>
+		</transition>
+		<transition>
+			<source ref="id84"/>
+			<target ref="id87"/>
+			<label kind="assignment" x="-578" y="0">initHuman()</label>
+		</transition>
+	</template>
+<template>
+<name>Robot</name>
+<parameter>int id, double _v_max, double _a_max, double posX, double posY</parameter>
+<declaration>
+clock V, Th, tUpd;
+
+trajectory traj = {{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0},{0.0, 0.0}};
+
+double ort = 0.0;
+int curr_traj = 0;
+
+// Position Sharing parameters
+int t = 0;
+const int T_poll = 1;
+int v_max;
+int a_max;
+
+bool needsTurning = false;
+void change_orientation(double sx, double sy, double dx, double dy) {
+	double cos_alpha, alpha, theta, delta;
+	double AC, AB;
+	bool turnLeft;
+
+	AC = pt_dist(sx, dx, sy, sy);
+	AB = pt_dist(sx, dx, sy, dy);
+
+	if (AB == 0)
+	{
+		return;
+	}
+
+	cos_alpha = AC / AB;
+	// angle between destination and hor. line
+	alpha = acos(cos_alpha);
+	// angle between robot axis and hor. line
+	theta = ort * 180 / PI;
+	// how much the robot should rotate [deg]
+	delta = 0.0;
+	turnLeft = false;
+
+	if (dx &gt;= sx &amp;&amp; dy &gt;= sy)
+	{ // Destination in 1st quadrant
+		alpha = alpha * (180 / PI);
+		if (alpha &gt; theta)
+		{
+			delta = alpha - theta;
+			turnLeft = true;
+		}
+		else
+		{
+			delta = theta - alpha;
+			turnLeft = false;
+		}
+	}
+	else if (dx &gt;= sx &amp;&amp; dy &lt;= sy)
+	{ // Destination in 2nd quadrant
+		alpha = -alpha * (180 / PI);
+		if (theta &lt; alpha)
+		{
+			delta = alpha - theta;
+			turnLeft = true;
+		}
+		else
+		{
+			delta = theta - alpha;
+			turnLeft = false;
+		}
+	}
+	else if (dx &lt;= sx &amp;&amp; dy &lt;= sy)
+	{ // Destination in 3rd quadrant
+		alpha = -(180 - alpha * (180 / PI));
+		if (theta &lt; alpha)
+		{
+			delta = alpha - theta;
+			turnLeft = true;
+		}
+		else
+		{
+			delta = theta - alpha;
+			turnLeft = false;
+		}
+	}
+	else if (dx &lt;= sx &amp;&amp; dy &gt;= sy)
+	{ // Destination in 4th quadrant
+		alpha = 180 - alpha * (180 / PI);
+		if (theta &lt; alpha)
+		{
+			delta = alpha - theta;
+			turnLeft = true;
+		}
+		else
+		{
+			delta = theta - alpha;
+			turnLeft = false;
+		}
+	}
+
+	needsTurning = delta &gt; 0.0;
+
+	if (needsTurning &amp;&amp; turnLeft)
+	{
+		ort = ort * 180 / PI + delta;
+	}
+	else if (needsTurning &amp;&amp; !turnLeft)
+	{
+		ort = ort * 180 / PI - delta;
+	}
+}
+
+point curr, dest;
+void plan_traj() {
+	int i, j, next_inters = -1;
+	int neigh[5] = {-1,-1,-1,-1,-1};
+	int	k = 0;
+	double dist, min_dist;
+	bool visited[N_I] = {false,false,false,false,false,false,false,false,false};
+	bool close;
+	curr[0] = internalRobX[id-1]; curr[1] = internalRobY[id-1];
+	dest[0] = dX[id-1]; dest[1] = dY[id-1];
+	// init trajectory
+	for (i = 0; i &lt; N_P; i++)
+	{
+		traj[i][0] = 0.0;
+		traj[i][1] = 0.0;
+	}
+	i = 0;
+	curr_traj = 0;
+
+	// builds trajectory by finding a path among adjacent areas
+	// (the existence of an intersection point means two areas are adjacent to each other)
+	// until the destination area is reached
+	close = same_area(curr[0], curr[1], dest[0], dest[1]);
+	while (!close)
+	{
+		for (j = 0; j &lt; N_I &amp;&amp; k&lt;3; j++)
+		{
+			// find all int. pts which are a neighbor of curr. point
+			// there are max. 3 in the long left hall
+			if (same_area(curr[0], curr[1], INTERSECTIONS[j][0], INTERSECTIONS[j][1]) &amp;&amp; !visited[j])
+			{
+				neigh[k] = j;
+				k++;
+			}
+		}
+		if(neigh[0]==-1) close = true;
+		else {
+		// next int. point to add to traj. is the closest to destination
+		min_dist = pt_dist(INTERSECTIONS[neigh[0]][0], dest[0], INTERSECTIONS[neigh[0]][1], dest[1]);
+		next_inters = neigh[0];
+		for (j = 1; j &lt; 5 &amp;&amp; neigh[j] != -1; j++)
+		{
+			dist = pt_dist(INTERSECTIONS[neigh[j]][0], dest[0], INTERSECTIONS[neigh[j]][1], dest[1]);
+			if (dist &lt; min_dist)
+			{
+				min_dist = dist;
+				next_inters = neigh[j];
+			}
+		}
+		// if trajectory is full, or no next point has been found,
+		// something has gone wrong, but I cannot raise an exception
+		if (i == N_P - 1 || next_inters == -1)
+			return;
+		// next inters point is set as visited,
+		visited[next_inters] = true;
+		// added to the trajectory,
+		traj[i][0] = INTERSECTIONS[next_inters][0];
+		traj[i][1] = INTERSECTIONS[next_inters][1];
+		i++;
+		// and set as current point
+		curr[0] = INTERSECTIONS[next_inters][0];
+		curr[1] = INTERSECTIONS[next_inters][1];
+		// reset
+		next_inters = -1;
+		k = 0;
+		for(j=0; j&lt;5;j++) neigh[j] = -1;
+		close = same_area(curr[0], curr[1], dest[0], dest[1]);
+		}
+	}
+	// destination point is always part of the trajectory
+	traj[i][0] = dest[0];
+	traj[i][1] = dest[1];
+
+	//sets initial orientation
+	change_orientation(internalRobX[id-1], internalRobY[id-1], traj[0][0], traj[0][1]);
+}
+
+void update_pos(double coeff) {
+	internalRobX[id-1] = internalRobX[id-1] + coeff*Tpoll*cos(ort*PI/180);
+	internalRobY[id-1] = internalRobY[id-1] + coeff*Tpoll*sin(ort*PI/180);
+}
+
+void initRobot() {
+	t = 0;
+	V = 0;
+	robPositionX[id-1] = posX;
+	robPositionY[id-1] = posY;
+	internalRobX[id-1] = posX;
+	internalRobY[id-1] = posY;
+	tUpd=0;
+	v_max = fint(_v_max);
+	a_max = fint(_a_max);
+}
+
+void varsUpdate(double coeff) {
+	tUpd = 0;
+
+	if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+		return;
+
+	if (pt_dist(internalRobX[id-1], traj[curr_traj][0], internalRobY[id-1], traj[curr_traj][1]) &lt; v_max*1.1) {
+		curr_traj++;
+		if (curr_traj &gt;= N_P || (traj[curr_traj][0]==0.0 &amp;&amp; traj[curr_traj][1]==0.0))
+			plan_traj();
+		change_orientation(internalRobX[id-1], internalRobY[id-1], traj[curr_traj][0], traj[curr_traj][1]);
+	}
+
+	update_pos(coeff);
+}
+</declaration>
+	<location id="id104" x="-629" y="-348">
+		<name x="-672" y="-365">idle</name>
+		<label kind="invariant" x="-722" y="-348">V' == 0 &amp;&amp;
+tUpd'==0</label>
+	</location>
+	<location id="id105" x="-424" y="-144">
+		<name x="-501" y="-144">stopping</name>
+		<label kind="invariant" x="-603" y="-144">V' == -a_max
+&amp;&amp; tUpd&lt;=Tpoll</label>
+		<label kind="comments" x="-603" y="-110">&amp;&amp; V &gt;=0</label>
+	</location>
+	<location id="id106" x="-425" y="-348">
+		<name x="-408" y="-366">starting</name>
+		<label kind="invariant" x="-348" y="-382">V' == a_max
+&amp;&amp; V &lt;= v_max
+&amp;&amp; tUpd&lt;=Tpoll</label>
+	</location>
+	<location id="id107" x="-161" y="-246">
+		<name x="-229" y="-263">moving</name>
+		<label kind="invariant" x="-263" y="-246">V' == 0 &amp;&amp;
+tUpd&lt;=Tpoll</label>
+	</location>
+	<location id="id108" x="-629" y="-527">
+		<name x="-639" y="-561">Init</name>
+		<committed/>
+	</location>
+	<location id="id109" x="-850" y="-459">
+		<name x="-943" y="-467">recharging</name>
+		<label kind="invariant" x="-926" y="-450">V'==0 &amp;&amp;
+tUpd'==0</label>
+	</location>
+	<location id="id110" x="195" y="-246">
+		<name x="212" y="-272">turning</name>
+		<label kind="invariant" x="212" y="-255">V'==0 &amp;&amp;
+Th&lt;=fabs(ort*PI/180)</label>
+	</location>
+	<location id="id111" x="51" y="-246">
+		<committed/>
+	</location>
+	<location id="id112" x="-425" y="-527">
+		<committed/>
+	</location>
+	<location id="id113" x="-425" y="76">
+		<committed/>
+	</location>
+	<location id="id114" x="-59" y="-204">
+		<committed/>
+	</location>
+	<location id="id115" x="-629" y="-144">
+		<committed/>
+	</location>
+	<init ref="id108"/>
+	<transition>
+		<source ref="id105"/>
+		<target ref="id115"/>
+		<label kind="guard" x="-612" y="-187">V &lt;= 0</label>
+		<label kind="assignment" x="-612" y="-170">active_robot[id-1] = true</label>
+	</transition>
+	<transition>
+		<source ref="id114"/>
+		<target ref="id107"/>
+		<label kind="synchronisation" x="-153" y="-229">publish_m[id]!</label>
+	</transition>
+	<transition>
+		<source ref="id111"/>
+		<target ref="id114"/>
+		<label kind="guard" x="-25" y="-229">!needsTurning</label>
+		<label kind="assignment" x="-25" y="-212">tUpd=0</label>
+	</transition>
+	<transition>
+		<source ref="id113"/>
+		<target ref="id105"/>
+		<label kind="synchronisation" x="-561" y="-42">publish_m[id]!</label>
+		<nail x="-459" y="17"/>
+		<nail x="-459" y="-85"/>
+	</transition>
+	<transition>
+		<source ref="id112"/>
+		<target ref="id106"/>
+		<label kind="synchronisation" x="-382" y="-467">publish_m[1]!</label>
+		<nail x="-391" y="-484"/>
+		<nail x="-391" y="-399"/>
+	</transition>
+	<transition>
+		<source ref="id105"/>
+		<target ref="id113"/>
+		<label kind="guard" x="-416" y="-25">tUpd&gt;=Tpoll
+&amp;&amp;V&gt;0</label>
+		<label kind="assignment" x="-416" y="8">t+=Tpoll, tUpd=0,
+varsUpdate(v_max-a_max*t)</label>
+	</transition>
+	<transition>
+		<source ref="id106"/>
+		<target ref="id112"/>
+		<label kind="guard" x="-527" y="-476">tUpd&gt;=Tpoll
+&amp;&amp;V&lt;v_max</label>
+		<label kind="assignment" x="-569" y="-442">t+=Tpoll, tUpd=0,
+varsUpdate(a_max*t)</label>
+	</transition>
+	<transition>
+		<source ref="id110"/>
+		<target ref="id105"/>
+		<label kind="guard" x="-119" y="-178">active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-331" y="-161">stop_r_action?</label>
+		<label kind="assignment" x="-119" y="-144">tUpd=0, t=0,
+active_robot[id-1] = false</label>
+		<nail x="195" y="-144"/>
+	</transition>
+	<transition>
+		<source ref="id110"/>
+		<target ref="id107"/>
+		<label kind="guard" x="-85" y="-365">Th&gt;=fabs(ort*PI/180)</label>
+		<label kind="assignment" x="-85" y="-348">tUpd = 0, Th = 0,
+needsTurning = false</label>
+		<nail x="195" y="-348"/>
+		<nail x="-161" y="-348"/>
+	</transition>
+	<transition>
+		<source ref="id111"/>
+		<target ref="id110"/>
+		<label kind="guard" x="67" y="-263">needsTurning</label>
+		<label kind="assignment" x="67" y="-246">Th=0</label>
+	</transition>
+	<transition>
+		<source ref="id107"/>
+		<target ref="id111"/>
+		<label kind="guard" x="-110" y="-280">tUpd&gt;=Tpoll</label>
+		<label kind="assignment" x="-119" y="-263">varsUpdate(v_max)</label>
+	</transition>
+	<transition>
+		<source ref="id105"/>
+		<target ref="id106"/>
+		<label kind="guard" x="-416" y="-323">V&gt;0 &amp;&amp;
+active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-416" y="-289">start_r_action?</label>
+		<label kind="assignment" x="-416" y="-272">t=0, tUpd=0,
+plan_traj(),
+active_robot[id-1] = false</label>
+	</transition>
+	<transition>
+		<source ref="id106"/>
+		<target ref="id105"/>
+		<label kind="guard" x="-603" y="-289">V&lt;v_max &amp;&amp;
+active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-603" y="-255">stop_r_action?</label>
+		<label kind="assignment" x="-603" y="-238">t=0, tUpd=0,
+active_robot[id-1] = false</label>
+		<nail x="-459" y="-323"/>
+		<nail x="-459" y="-161"/>
+	</transition>
+	<transition>
+		<source ref="id109"/>
+		<target ref="id104"/>
+		<label kind="guard" x="-816" y="-510">active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-816" y="-493">stop_recharging?</label>
+		<label kind="assignment" x="-816" y="-476">tUpd=0,
+active_robot[id-1] = false</label>
+		<nail x="-629" y="-459"/>
+	</transition>
+	<transition>
+		<source ref="id104"/>
+		<target ref="id109"/>
+		<label kind="synchronisation" x="-842" y="-416">start_recharging[id]?</label>
+		<nail x="-850" y="-348"/>
+	</transition>
+	<transition>
+		<source ref="id115"/>
+		<target ref="id104"/>
+		<label kind="synchronisation" x="-680" y="-221">r_still!</label>
+		<label kind="assignment" x="-680" y="-204">t=0,
+tUpd = 0,
+V=0</label>
+		<nail x="-629" y="-161"/>
+		<nail x="-629" y="-161"/>
+	</transition>
+	<transition>
+		<source ref="id107"/>
+		<target ref="id105"/>
+		<label kind="guard" x="-331" y="-178">active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-119" y="-161">stop_r_action?</label>
+		<label kind="assignment" x="-331" y="-144">tUpd=0, t=0,
+active_robot[id-1] = false</label>
+		<nail x="-160" y="-144"/>
+	</transition>
+	<transition>
+		<source ref="id106"/>
+		<target ref="id107"/>
+		<label kind="guard" x="-246" y="-331">V &gt;= v_max</label>
+		<label kind="assignment" x="-238" y="-314">t+=Tpoll,
+tUpd=0,
+V=v_max</label>
+		<nail x="-161" y="-348"/>
+	</transition>
+	<transition>
+		<source ref="id104"/>
+		<target ref="id106"/>
+		<label kind="guard" x="-620" y="-391">active_robot[id-1] == true</label>
+		<label kind="synchronisation" x="-578" y="-374">start_r_action?</label>
+		<label kind="assignment" x="-603" y="-348">t=0, tUpd=0,
+plan_traj(),
+active_robot[id-1] = false</label>
+	</transition>
+	<transition>
+		<source ref="id108"/>
+		<target ref="id104"/>
+		<label kind="assignment" x="-621" y="-484">initRobot()</label>
+	</transition>
+</template>
+<template>
+    <name>Battery</name>
+    <parameter>int id, double Cstart</parameter>
+    <declaration>
+clock C, t, tUpd;
+
+// BatteryStatus Sharing parameters
+int dt = 0;
+
+const double C_fail = 10.9;
+const double C_100 = 12.6;
+
+double d_0 = C_100;
+const double d_1 = -3.05366882 * pow(10, -4);
+const double d_2 = 2.46157427 * pow(10, -8);
+const double d_3 = -8.33622587 * pow(10, -13);
+
+double r_0 = C_100;
+const double r_1 = +3.05366882 * pow(10, -4);
+const double r_2 = +2.46157427 * pow(10, -8);
+const double r_3 = -8.33622587 * pow(10, -13);
+
+
+void updateCharge(bool charging) {
+    if (charging) internal_charge[id - 1] = internal_charge[id - 1] +
+                                  Tpoll * (r_1 + r_2 * Tpoll + 2 * r_2 * dt + r_3 * pow(Tpoll, 2)
+                                    + 3 * r_3 * pow(dt, 2) + 3 * r_3 * dt * Tpoll);
+    else
+        internal_charge[id - 1] = internal_charge[id - 1] +
+                                  Tpoll * (d_1 + d_2 * Tpoll + 2 * d_2 * dt + d_3 * pow(Tpoll, 2)
+                                    + 3 * d_3 * pow(dt, 2) + 3 * d_3 * dt * Tpoll);
+    dt += Tpoll;
+}
+
+void initBattery() {
+    t = 0;
+    C = Cstart;
+    batteryCharge[id - 1] = Cstart;
+    internal_charge[id - 1] = Cstart;
+    tUpd = 0;
+}
+</declaration>
+    <location id="id116" x="416" y="204">
+        <name x="391" y="170">Init</name>
+        <committed/>
+    </location>
+    <location id="id117" x="1071" y="204">
+        <name x="1088" y="179">empty</name>
+        <label kind="invariant" x="1088" y="196">C'==0</label>
+        <label kind="exponentialrate" x="1088" y="162">1</label>
+    </location>
+    <location id="id118" x="688" y="204">
+        <name x="696" y="179">discharging</name>
+        <label kind="invariant" x="697" y="127">tUpd &lt;= Tpoll
+&amp;&amp; C' == d_1 + 2*d_2*t + 3*d_3*t*t
+&amp;&amp; C&gt;=C_fail</label>
+    </location>
+    <location id="id119" x="689" y="425">
+        <name x="697" y="434">recharging</name>
+        <label kind="invariant" x="697" y="451">C' == r_1 + 2*r_2*t + 3*r_3*t*t
+&amp;&amp; tUpd &lt;= Tpoll</label>
+    </location>
+    <location id="id120" x="595" y="119">
+        <committed/>
+    </location>
+    <location id="id121" x="595" y="519">
+        <committed/>
+    </location>
+    <init ref="id116"/>
+    <transition>
+        <source ref="id118"/>
+        <target ref="id117"/>
+        <label kind="guard" x="901" y="204">C&lt;=C_fail</label>
+        <label kind="synchronisation" x="875" y="221">dead_battery!</label>
+        <label kind="assignment" x="799" y="238">active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id121"/>
+        <target ref="id119"/>
+        <label kind="synchronisation" x="544" y="459">publish_m[0]!</label>
+    </transition>
+    <transition>
+        <source ref="id119"/>
+        <target ref="id121"/>
+        <label kind="guard" x="621" y="519">tUpd&gt;=Tpoll</label>
+        <label kind="assignment" x="621" y="536">tUpd=0, updateCharge(1)</label>
+        <nail x="689" y="519"/>
+    </transition>
+    <transition>
+        <source ref="id120"/>
+        <target ref="id118"/>
+        <label kind="synchronisation" x="536" y="153">publish_m[0]!</label>
+    </transition>
+    <transition>
+        <source ref="id118"/>
+        <target ref="id120"/>
+        <label kind="guard" x="620" y="76">tUpd&gt;=Tpoll &amp;&amp; C&gt;C_fail</label>
+        <label kind="assignment" x="620" y="93">tUpd=0, updateCharge(0)</label>
+        <nail x="688" y="119"/>
+    </transition>
+    <transition>
+        <source ref="id116"/>
+        <target ref="id118"/>
+        <label kind="assignment" x="442" y="178">initBattery()</label>
+    </transition>
+    <transition>
+        <source ref="id119"/>
+        <target ref="id118"/>
+        <label kind="synchronisation" x="519" y="298">stop_recharging?</label>
+        <label kind="assignment" x="519" y="315">d_0=C, t=0,
+tUpd = 0, dt=0,
+active_robot[id-1] = false</label>
+    </transition>
+    <transition>
+        <source ref="id118"/>
+        <target ref="id119"/>
+        <label kind="synchronisation" x="723" y="306">start_recharging[id]?</label>
+        <label kind="assignment" x="723" y="323">r_0=C, t=0,
+tUpd = 0, dt=0</label>
+        <nail x="714" y="263"/>
+        <nail x="714" y="374"/>
+    </transition>
+    <transition>
+        <source ref="id117"/>
+        <target ref="id117"/>
+        <nail x="1088" y="247"/>
+        <nail x="1113" y="230"/>
+    </transition>
+</template>
+<template>
+    <name>Orchestrator</name>
+    <parameter>int id</parameter>
+    <declaration>
+clock ROS;
+
+double latency = 1.5;
+double eps = 0.0;
+
+void update_eps() {
+    eps = random_normal(0.5, 0.05);
+}
+
+void complete_leader() {
+    if(served[currH-1] &amp;&amp; currH&lt;H &amp;&amp; patterns[currH]==1)
+    currH++;
+}
+
+void complete_recipient() {
+    served[currH-1] = true;
+    if(currH&lt;H)
+        currH++;
+}
+
+//This function change the current robot to fulfill the current task. The new coR should reach the recharge station and recharge itself.
+void exchange_robots(){
+    int tmp;
+    tmp = coR;
+    coR = currR;
+    currR = tmp;
+
+    currOp[currR-1] = 1;
+    currOp[coR-1] = 4;
+}
+</declaration>
+    <location id="id122" x="-1028" y="-1989">
+        <committed/>
+    </location>
+    <location id="id123" x="-2711" y="-2218">
+        <name x="-2779" y="-2235">o_init</name>
+        <committed/>
+    </location>
+    <location id="id124" x="-1700" y="-2218">
+        <name x="-1751" y="-2252">x_move</name>
+        <label kind="invariant" x="-1776" y="-2218">ROS'==0</label>
+    </location>
+    <location id="id125" x="-2142" y="-2388">
+        <name x="-2134" y="-2380">r_rech</name>
+    </location>
+    <location id="id126" x="-2312" y="-2218">
+        <name x="-2337" y="-2252">r_start</name>
+        <label kind="invariant" x="-2322" y="-2201">ROS &lt;= latency + eps</label>
+    </location>
+    <location id="id127" x="-1181" y="-2159">
+        <name x="-1173" y="-2150">o_scs</name>
+        <label kind="invariant" x="-1173" y="-2133">ROS'==0</label>
+        <label kind="exponentialrate" x="-1139" y="-2176">1</label>
+    </location>
+    <location id="id128" x="-1181" y="-2278">
+        <name x="-1173" y="-2269">o_fail_2</name>
+        <label kind="invariant" x="-1173" y="-2252">ROS'==0</label>
+        <label kind="exponentialrate" x="-1139" y="-2295">1</label>
+    </location>
+    <location id="id129" x="-1258" y="-2388">
+        <name x="-1351" y="-2379">to_2nd_task</name>
+        <committed/>
+    </location>
+    <location id="id130" x="-1666" y="-2387">
+        <name x="-1657" y="-2379">starting_2</name>
+        <committed/>
+    </location>
+    <location id="id131" x="-2303" y="-2388">
+        <name x="-2295" y="-2380">stopping_2</name>
+        <committed/>
+    </location>
+    <location id="id132" x="-2108" y="-2218">
+        <name x="-2167" y="-2210">h_start</name>
+        <committed/>
+    </location>
+    <location id="id133" x="-1572" y="-2218">
+        <name x="-1582" y="-2252">x_stop</name>
+        <label kind="invariant" x="-1581" y="-2269">ROS &lt;= latency + eps</label>
+    </location>
+    <location id="id134" x="-1258" y="-2219">
+        <name x="-1241" y="-2235">stopping</name>
+        <label kind="invariant" x="-1241" y="-2218">ROS'==0</label>
+        <label kind="exponentialrate" x="-1275" y="-2210">1</label>
+    </location>
+    <location id="id135" x="-1853" y="-2218">
+        <name x="-1844" y="-2210">starting</name>
+        <committed/>
+    </location>
+    <location id="id136" x="-1377" y="-2142">
+        <name x="-1394" y="-2176">h_stop</name>
+        <committed/>
+    </location>
+    <location id="id137" x="-1666" y="-2456">
+        <name x="-1657" y="-2448">delivering</name>
+        <committed/>
+    </location>
+    <location id="id138" x="-2431" y="-2218">
+        <name x="-2473" y="-2227">idle</name>
+        <label kind="invariant" x="-2507" y="-2244">ROS'==0</label>
+        <label kind="exponentialrate" x="-2441" y="-2184">1</label>
+    </location>
+    <location id="id139" x="-2431" y="-2116">
+        <name x="-2507" y="-2082">o_fail_1</name>
+        <label kind="invariant" x="-2507" y="-2099">ROS'==0</label>
+        <label kind="exponentialrate" x="-2456" y="-2133">1</label>
+    </location>
+    <location id="id140" x="-2218" y="-2218">
+        <committed/>
+    </location>
+    <location id="id141" x="-1802" y="-2218">
+        <committed/>
+    </location>
+    <location id="id142" x="-1419" y="-2218">
+        <committed/>
+    </location>
+    <location id="id143" x="-2431" y="-2388">
+        <committed/>
+    </location>
+    <location id="id144" x="-1870" y="-2388">
+        <committed/>
+    </location>
+    <location id="id145" x="-2609" y="-2218">
+        <committed/>
+    </location>
+    <location id="id146" x="-2669" y="-2167">
+        <committed/>
+    </location>
+    <location id="id147" x="-2550" y="-2167">
+        <committed/>
+    </location>
+    <location id="id148" x="-2354" y="-1989">
+        <name x="-2337" y="-2014">r_synch</name>
+        <label kind="invariant" x="-2516" y="-1997">ROS &lt;= latency + eps</label>
+    </location>
+    <location id="id149" x="-2133" y="-1989">
+        <committed/>
+    </location>
+    <location id="id150" x="-1946" y="-1989">
+        <name x="-1956" y="-2023">r1</name>
+        <label kind="invariant" x="-2023" y="-2014">ROS'==0</label>
+    </location>
+    <location id="id151" x="-1768" y="-1989">
+        <name x="-1778" y="-2023">r2</name>
+        <label kind="invariant" x="-1751" y="-2014">ROS &lt;= latency + eps</label>
+    </location>
+    <location id="id152" x="-1428" y="-1989">
+        <name x="-1436" y="-2023">stopping_coR</name>
+        <label kind="invariant" x="-1521" y="-2014">ROS'==0</label>
+        <label kind="exponentialrate" x="-1428" y="-1997">1</label>
+    </location>
+    <location id="id153" x="-1564" y="-1989">
+        <committed/>
+    </location>
+    <location id="id154" x="-1428" y="-1912">
+        <name x="-1504" y="-1938">o_fail_3</name>
+        <label kind="invariant" x="-1521" y="-1921">ROS'==0</label>
+        <label kind="exponentialrate" x="-1428" y="-1921">1</label>
+    </location>
+    <location id="id155" x="-1207" y="-1989">
+        <committed/>
+    </location>
+    <location id="id156" x="-1504" y="-2142">
+        <committed/>
+    </location>
+    <init ref="id123"/>
+    <transition>
+        <source ref="id156"/>
+        <target ref="id136"/>
+        <label kind="synchronisation" x="-1487" y="-2142">stop_r_action!</label>
+    </transition>
+    <transition>
+        <source ref="id125"/>
+        <target ref="id131"/>
+        <label kind="guard" x="-2269" y="-2422">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-2244" y="-2456">opchk_scs?</label>
+        <label kind="assignment" x="-2269" y="-2405">active_robot[id-1] = false</label>
+    </transition>
+    <transition>
+        <source ref="id122"/>
+        <target ref="id138"/>
+        <label kind="synchronisation" x="-1708" y="-2091">opchk_start!</label>
+        <label kind="assignment" x="-1691" y="-2065">ROS=0</label>
+        <nail x="-1028" y="-2065"/>
+        <nail x="-2303" y="-2074"/>
+    </transition>
+    <transition>
+        <source ref="id155"/>
+        <target ref="id122"/>
+        <label kind="assignment" x="-1189" y="-1989">exchange_robots(),
+        active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id152"/>
+        <target ref="id155"/>
+        <label kind="guard" x="-1377" y="-1972">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-1334" y="-1989">r_still?</label>
+        <label kind="assignment" x="-1377" y="-1955">active_robot[id-1] = false</label>
+    </transition>
+    <transition>
+        <source ref="id154"/>
+        <target ref="id154"/>
+        <nail x="-1436" y="-1904"/>
+        <nail x="-1436" y="-1887"/>
+        <nail x="-1419" y="-1878"/>
+        <nail x="-1402" y="-1895"/>
+    </transition>
+    <transition>
+        <source ref="id152"/>
+        <target ref="id154"/>
+        <label kind="guard" x="-1419" y="-1963">fail</label>
+        <label kind="synchronisation" x="-1419" y="-1946">r_still?</label>
+    </transition>
+    <transition>
+        <source ref="id138"/>
+        <target ref="id148"/>
+        <label kind="guard" x="-2363" y="-2040">synch &amp;&amp; coR == id</label>
+        <label kind="synchronisation" x="-2363" y="-2057">opchk_start!</label>
+    </transition>
+    <transition>
+        <source ref="id145"/>
+        <target ref="id147"/>
+        <label kind="assignment" x="-2652" y="-2150">active_robot[id-1] = false</label>
+    </transition>
+    <transition>
+        <source ref="id123"/>
+        <target ref="id146"/>
+        <label kind="assignment" x="-2864" y="-2193">active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id147"/>
+        <target ref="id138"/>
+        <label kind="assignment" x="-2532" y="-2192">ROS=0</label>
+    </transition>
+    <transition>
+        <source ref="id146"/>
+        <target ref="id145"/>
+        <label kind="synchronisation" x="-2677" y="-2261">opchk_start!</label>
+    </transition>
+    <transition>
+        <source ref="id130"/>
+        <target ref="id144"/>
+        <label kind="assignment" x="-1853" y="-2431">currOp[id-1]=3,
+        active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id131"/>
+        <target ref="id143"/>
+        <label kind="assignment" x="-2448" y="-2439">currOp[id-1]=1,
+        active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id133"/>
+        <target ref="id142"/>
+        <label kind="guard" x="-1530" y="-2261">!stopHuman &amp;&amp;
+        ROS &gt;= latency + eps</label>
+        <label kind="assignment" x="-1547" y="-2218">active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id135"/>
+        <target ref="id141"/>
+        <label kind="assignment" x="-1921" y="-2269">active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id126"/>
+        <target ref="id140"/>
+        <label kind="guard" x="-2269" y="-2295">ROS &gt;= latency + eps
+        &amp;&amp; !exeRobot</label>
+        <label kind="assignment" x="-2269" y="-2244">active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id134"/>
+        <target ref="id123"/>
+        <label kind="guard" x="-2167" y="-2609">currOp[id-1]==6 || currOp[id-1] == 7</label>
+        <label kind="assignment" x="-2091" y="-2592">currOp[id-1]=1</label>
+        <nail x="-1258" y="-2235"/>
+        <nail x="-1258" y="-2575"/>
+        <nail x="-2711" y="-2575"/>
+    </transition>
+    <transition>
+        <source ref="id126"/>
+        <target ref="id132"/>
+        <label kind="guard" x="-2244" y="-2176">ROS &gt;= latency + eps
+        &amp;&amp; exeRobot</label>
+        <nail x="-2218" y="-2159"/>
+    </transition>
+    <transition>
+        <source ref="id138"/>
+        <target ref="id127"/>
+        <label kind="synchronisation" x="-2133" y="-2125">opchk_scs?</label>
+        <nail x="-2371" y="-2108"/>
+        <nail x="-1181" y="-2108"/>
+    </transition>
+    <transition>
+        <source ref="id139"/>
+        <target ref="id139"/>
+        <nail x="-2431" y="-2056"/>
+        <nail x="-2405" y="-2056"/>
+    </transition>
+    <transition>
+        <source ref="id138"/>
+        <target ref="id139"/>
+        <label kind="synchronisation" x="-2516" y="-2176">opchk_fail?</label>
+    </transition>
+    <transition>
+        <source ref="id138"/>
+        <target ref="id126"/>
+        <label kind="guard" x="-2456" y="-2261">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-2414" y="-2244">opchk_stop?</label>
+        <label kind="assignment" x="-2397" y="-2210">ROS = 0,
+        update_eps(),
+        active_robot[id-1] = false</label>
+    </transition>
+    <transition>
+        <source ref="id137"/>
+        <target ref="id123"/>
+        <label kind="synchronisation" x="-2040" y="-2507">stop_h_action!</label>
+        <label kind="assignment" x="-2040" y="-2490">currOp[id-1]=1,
+        complete_recipient()</label>
+        <nail x="-2711" y="-2456"/>
+    </transition>
+    <transition>
+        <source ref="id129"/>
+        <target ref="id137"/>
+        <label kind="guard" x="-1632" y="-2490">currOp[id-1]==4 &amp;&amp; patterns[currH-1]==2</label>
+        <label kind="synchronisation" x="-1632" y="-2473">start_h_action!</label>
+        <nail x="-1258" y="-2456"/>
+    </transition>
+    <transition>
+        <source ref="id132"/>
+        <target ref="id135"/>
+        <label kind="guard" x="-2048" y="-2193">!startHuman</label>
+        <nail x="-1989" y="-2192"/>
+    </transition>
+    <transition>
+        <source ref="id136"/>
+        <target ref="id134"/>
+        <label kind="synchronisation" x="-1360" y="-2159">stop_h_action!</label>
+        <nail x="-1258" y="-2142"/>
+    </transition>
+    <transition>
+        <source ref="id133"/>
+        <target ref="id156"/>
+        <label kind="guard" x="-1564" y="-2201">stopHuman &amp;&amp;
+        ROS &gt;= latency + eps</label>
+        <label kind="assignment" x="-1564" y="-2167">active_robot[id-1] = true</label>
+        <nail x="-1572" y="-2142"/>
+    </transition>
+    <transition>
+        <source ref="id141"/>
+        <target ref="id124"/>
+        <label kind="synchronisation" x="-1793" y="-2235">opchk_start!</label>
+    </transition>
+    <transition>
+        <source ref="id132"/>
+        <target ref="id135"/>
+        <label kind="guard" x="-2048" y="-2252">startHuman</label>
+        <label kind="synchronisation" x="-2048" y="-2235">start_h_action!</label>
+    </transition>
+    <transition>
+        <source ref="id134"/>
+        <target ref="id129"/>
+        <label kind="guard" x="-1224" y="-2414">stop [id-1]&amp;&amp; (currOp[id-1]==2 ||
+        (currOp[id-1]==4 &amp;&amp;
+        patterns[currH-1]==2)) &amp;&amp;
+        active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-1224" y="-2431">r_still?</label>
+        <label kind="assignment" x="-1224" y="-2346">active_robot[id-1] = false</label>
+    </transition>
+    <transition>
+        <source ref="id134"/>
+        <target ref="id127"/>
+        <label kind="guard" x="-1232" y="-2159">scs</label>
+        <nail x="-1232" y="-2159"/>
+    </transition>
+    <transition>
+        <source ref="id134"/>
+        <target ref="id128"/>
+        <label kind="guard" x="-1232" y="-2295">fail</label>
+        <nail x="-1232" y="-2278"/>
+    </transition>
+    <transition>
+        <source ref="id124"/>
+        <target ref="id133"/>
+        <label kind="guard" x="-1708" y="-2303">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-1674" y="-2286">opchk_scs?</label>
+        <label kind="assignment" x="-1759" y="-2193">ROS = 0,
+        update_eps(),
+        active_robot[id-1] = false</label>
+        <nail x="-1640" y="-2227"/>
+    </transition>
+    <transition>
+        <source ref="id124"/>
+        <target ref="id133"/>
+        <label kind="guard" x="-1708" y="-2303">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-1674" y="-2269">opchk_fail?</label>
+        <label kind="assignment" x="-1759" y="-2193">ROS = 0,
+        update_eps(),
+        active_robot[id-1] = false</label>
+        <nail x="-1640" y="-2235"/>
+    </transition>
+    <transition>
+        <source ref="id134"/>
+        <target ref="id123"/>
+        <label kind="guard" x="-2065" y="-2354">stop[id-1] &amp;&amp; !(currOp[id-1]==2 ||
+        (currOp[id-1]==4 &amp;&amp;
+        patterns[currH-1]==2)) &amp;&amp;
+        active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-2244" y="-2363">r_still?</label>
+        <label kind="assignment" x="-2252" y="-2346">currOp[id-1]=1,
+        complete_leader(),
+        active_robot[id-1] = -1</label>
+        <nail x="-1258" y="-2303"/>
+        <nail x="-2711" y="-2303"/>
+    </transition>
+    <transition>
+        <source ref="id142"/>
+        <target ref="id134"/>
+        <label kind="synchronisation" x="-1394" y="-2235">stop_r_action!</label>
+    </transition>
+    <transition>
+        <source ref="id124"/>
+        <target ref="id133"/>
+        <label kind="guard" x="-1708" y="-2303">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-1683" y="-2252">opchk_stop?</label>
+        <label kind="assignment" x="-1759" y="-2193">ROS = 0,
+        update_eps(),
+        active_robot[id-1] = false</label>
+        <nail x="-1640" y="-2218"/>
+    </transition>
+    <transition>
+        <source ref="id140"/>
+        <target ref="id132"/>
+        <label kind="synchronisation" x="-2269" y="-2261">start_r_action!</label>
+    </transition>
+    <transition>
+        <source ref="id143"/>
+        <target ref="id123"/>
+        <label kind="synchronisation" x="-2609" y="-2414">stop_recharging!</label>
+        <nail x="-2711" y="-2388"/>
+    </transition>
+    <transition>
+        <source ref="id125"/>
+        <target ref="id131"/>
+        <label kind="guard" x="-2269" y="-2422">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-2244" y="-2439">opchk_stop?</label>
+        <label kind="assignment" x="-2269" y="-2405">active_robot[id-1] = false</label>
+    </transition>
+    <transition>
+        <source ref="id144"/>
+        <target ref="id125"/>
+        <label kind="synchronisation" x="-2006" y="-2414">opchk_start!</label>
+    </transition>
+    <transition>
+        <source ref="id129"/>
+        <target ref="id130"/>
+        <label kind="guard" x="-1632" y="-2422">currOp[id-1]==2</label>
+        <label kind="synchronisation" x="-1632" y="-2405">start_recharging[id]!</label>
+    </transition>
+    <transition>
+        <source ref="id127"/>
+        <target ref="id127"/>
+        <nail x="-1122" y="-2159"/>
+        <nail x="-1122" y="-2184"/>
+    </transition>
+    <transition>
+        <source ref="id128"/>
+        <target ref="id128"/>
+        <nail x="-1122" y="-2303"/>
+        <nail x="-1122" y="-2278"/>
+    </transition>
+    <transition>
+        <source ref="id149"/>
+        <target ref="id150"/>
+        <label kind="synchronisation" x="-2116" y="-1989">start_r_action!</label>
+    </transition>
+    <transition>
+        <source ref="id148"/>
+        <target ref="id149"/>
+        <label kind="guard" x="-2329" y="-1980">ROS &gt;= latency + eps</label>
+        <label kind="assignment" x="-2329" y="-1963">active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id150"/>
+        <target ref="id151"/>
+        <label kind="guard" x="-1946" y="-1980">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-1912" y="-1963">opchk_scs?</label>
+        <label kind="assignment" x="-1904" y="-2048">ROS = 0,
+        update_eps()</label>
+        <nail x="-1870" y="-1997"/>
+    </transition>
+    <transition>
+        <source ref="id150"/>
+        <target ref="id151"/>
+        <label kind="guard" x="-1946" y="-1980">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-1912" y="-1946">opchk_fail?</label>
+        <label kind="assignment" x="-1904" y="-2048">ROS = 0,
+        update_eps()</label>
+        <nail x="-1870" y="-2006"/>
+    </transition>
+    <transition>
+        <source ref="id150"/>
+        <target ref="id151"/>
+        <label kind="guard" x="-1946" y="-1980">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-1921" y="-1929">opchk_stop?</label>
+        <label kind="assignment" x="-1904" y="-2048">ROS = 0,
+        update_eps()</label>
+        <nail x="-1870" y="-1989"/>
+    </transition>
+    <transition>
+        <source ref="id151"/>
+        <target ref="id153"/>
+        <label kind="guard" x="-1734" y="-1989">ROS &gt;= latency + eps</label>
+        <label kind="assignment" x="-1734" y="-1972">active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id153"/>
+        <target ref="id152"/>
+        <label kind="synchronisation" x="-1547" y="-1989">stop_r_action!</label>
+    </transition>
+</template>
+<template>
+    <name>OpChk</name>
+    <parameter>int id, int T_int, int T_proc</parameter>
+    <declaration>
+clock t_act;
+
+
+//Human-Robot Distance Parameters
+const double safetyDistance = 2.0;
+const double stopDistance = 6.0;
+const double restartDistance = 3.0;
+int recipientStages = 0;
+
+//Recharging Policy Parameters
+const double rechargingTh = 11.1;
+const double stopRechargingTh = 11.4;
+const double failBattery = 11.0;
+
+//Fatigue-Monitoring Parameters
+const double failFatigue = 0.97;
+const double stopFatigue = 0.6;
+const double resumeFatigue = 0.3;
+
+
+/**
+* Init
+**/
+
+void initialize() {
+    if (currR == id) stop[currR-1] = false;
+    else if (coR == id) stop[coR-1] = false;
+    exeRobot=false;
+    stopHuman= false;
+    startHuman=false;
+}
+
+/**
+* Pattern-Specific Logics
+**/
+
+bool getStart(int pattern) {
+    double humanRobotDist = calculateDistance();
+    double dist_to_dest = pt_dist(robPositionX[currR-1], dX[currR-1], robPositionY[currR-1], dY[currR-1]);
+    double dist = 100.0*1.2;
+
+    if(pattern==0) { //start cond. for follower
+        if (humanRobotDist&gt;=stopDistance)  //if human and robot are too distant
+            return batteryCharge[id-1]&gt;=rechargingTh; //starts if battery is sufficient
+        else return batteryCharge[id-1]&gt;=rechargingTh &amp;&amp; //starts if battery is sufficient,
+                ((!stopHuman &amp;&amp; humanRobotDist&lt;=restartDistance) || //if human and robot are close again,
+                (stopHuman &amp;&amp; humanFatigue[currH-1]&lt;=resumeFatigue)); //or if human has rested enough
+    }
+    else if(pattern==1) // start cond. for leader
+        return hExe; //starts if human has started
+    else if(pattern==2) // start cond. for recipient
+        return batteryCharge[id-1]&gt;=rechargingTh; // starts if battery is sufficient
+    else if(pattern==3)
+        return batteryCharge[id-1]&gt;rechargingTh &amp;&amp;
+    (pt_dist(robPositionX[currR-1], destX[currH-1], robPositionY[currR-1], destY[currH-1]) &lt;= dist &amp;&amp;
+    pt_dist(humanPositionX[currH-1], destX[currH-1], humanPositionY[currH-1], destY[currH-1]) &lt;= dist ||
+                                                                                                    pt_dist(robPositionX[currR-1], destX[currH-1], robPositionY[currR-1], destY[currH-1]) &gt; dist) ;
+    else if(pattern == 10)// start cond. for interdependence by contract
+        return batteryCharge[id-1]&gt;=rechargingTh;//start if battery is sufficient
+    else if(pattern == 12) // start cond. for competition
+        return batteryCharge[id-1]&gt;=rechargingTh;
+    else
+    return false;
+}
+
+double humanRobotDist;
+void setOpParams(int pattern) {
+    humanRobotDist = calculateDistance();
+    exeRobot= false;
+    // operational parameters (destination for robot, and op. state)
+    if (pattern==0) { //follower
+        currOp[currR-1] = 4;
+        if (humanRobotDist&lt;=stopDistance) { //if human and robot are close,
+            dX[currR-1] = destX[currH-1]; // move towards destination
+            dY[currR-1] = destY[currH-1];
+        } else { // !! ONLINE RECONFIGURATION FEATURE !!
+            dX[currR-1] = humanPositionX[currH-1]; //if human and robot are distant,
+            dY[currR-1] = humanPositionY[currH-1]; //move towards human
+        }
+    } else if (pattern==1) { //leader
+        currOp[currR-1] = 5;
+        dX[currR-1] = humanPositionX[currH-1]; // follow human
+        dY[currR-1] = humanPositionY[currH-1];
+    } else if (pattern==2) { //recipient
+        currOp[currR-1] = 4;
+        recipientStages = 1;
+        dX[currR-1] = destX[currH-1]; // move towards object location
+        dY[currR-1] = destY[currH-1];
+    } else if (pattern==3){
+        double dist_to_dest = pt_dist(robPositionX[currR-1], destX[currH-1], robPositionY[currR-1], destY[currH-1]);
+        if (dist_to_dest &gt; 50.0) {
+            currOp[id-1]=4;
+            dX[currR-1] = destX[currH-1];
+            dY[currR-1] = destY[currH-1];
+        }
+        else {
+            currOp[currR-1]=6;
+            exeRobot=true;
+        }
+    } else if(pattern==10) { // interdependence by contract
+        currOp[currR-1] = 4;
+        //The robot shouldn't move ==&gt; set dest to initial position of robot
+        dX[currR-1] = destX[currH-1];
+        dY[currR-1] = destY[currH-1];
+    } else if(pattern==12) { // competition
+        currOp[currR-1] = 4;
+        dX[currR-1] = destX[currH-1]; // move towards object location
+        dY[currR-1] = destY[currH-1];
+    }
+}
+
+bool getStop(int pattern) {
+    double humanRobotDist = pt_dist(robPositionX[currR-1], humanPositionX[currH-1], robPositionY[currR-1],
+                                    humanPositionY[currH-1])/100;
+    double dist_to_dest = pt_dist(robPositionX[currR-1], dX[currR-1], robPositionY[currR-1], dY[currR-1]);
+    double dist = 100.0*2.0;
+
+    if(pattern==0) { // stop cond. for follower
+        if(dX[currR-1]==destX[currH-1] &amp;&amp; dY[currR-1]==destY[currH-1]) { //if currently moving towards destination
+            stopHuman = humanFatigue[currH-1]&gt;=stopFatigue; //stop human if too fatigued
+            // stop robot if close to destination, human is too tired or too distant
+            return dist_to_dest&lt;=dist || stopHuman || humanRobotDist&gt;=stopDistance;
+        } else
+        return humanRobotDist&lt;=restartDistance ||
+            (dX[currR-1] == rechargeStation[0] &amp;&amp; dY[currR-1] == rechargeStation[1] &amp;&amp; dist_to_dest&lt;=dist); // else stop if close to human or recharge station
+    } else if (pattern==1) // stop cond. for leader
+        return dist_to_dest&lt;=dist || (!hExe &amp;&amp; dist_to_dest&lt;=dist); // stop if human has stopped
+    else if (pattern==2 || pattern==3){ // stop cond. for recipient
+        return dist_to_dest&lt;=dist; // stop if close to destination
+    } else if (pattern==10)// interdependence by contract
+        return !hExe;
+    else if (pattern==12) // competition
+        return dist_to_dest&lt;=dist;
+    else
+    return false;
+}
+
+/**
+* Operating Mode Checks
+**/
+
+void check_r_rech(){
+    if(batteryCharge[currR-1]&gt;=stopRechargingTh) //if recharging, stop when recharged
+    stop[currR-1] = true;
+}
+
+void check_fail(){
+    // mission fails if battery gets to 0, or human passes out
+    if(batteryCharge[id-1]&lt;=failBattery ||
+                               humanFatigue[currH-1]&gt;=failFatigue) {
+        fail = true;
+        currOp[currR-1] = 0;
+    }
+}
+
+void check_scs(){
+    // mission is accomplished if all humans are served
+    if(served[H-1]) {
+        scs = true;
+        currOp[currR-1] = 0;
+    }
+}
+
+void check_h_move(){
+    stop[currR-1] = getStop(patterns[currH-1]);
+
+    if(!stop[currR-1]) {
+        dX[currR-1] = humanPositionX[currH-1];
+        dY[currR-1] = humanPositionY[currH-1];
+    }
+}
+
+void check_r_move(){
+    // stop moving if battery is low and start task handover
+    if(currOp[currR-1]==4 &amp;&amp; batteryCharge[currR-1]&lt;=rechargingTh) {
+        stop[currR-1] = true;
+        if (patterns[currH-1]==3 || patterns[currH-1]==0) stopHuman=true;
+        return;
+    }
+
+    stop[currR-1] = getStop(patterns[currH-1]);
+
+    // if human is a recipient, and robot has arrived to
+    // its current destination
+    if(patterns[currH-1]==2 &amp;&amp; stop[currR-1]) {
+        // if it is the first stage, move on to the second one
+        // and reach the human
+        if(recipientStages==1) {
+            stop[currR-1] = false;
+            stopHuman = false;
+            dX[currR-1] = humanPositionX[currH-1];
+            dY[currR-1] = humanPositionY[currH-1];
+            recipientStages++;
+        }
+    }
+}
+
+int select_coR() {
+    int i, closest= -1;
+    double dist, min_dist = 100000.0;
+    if(R&gt;=2) {
+        for(i=0; i &lt; R; i++) {
+            dist = pt_dist(robPositionX[currR-1], robPositionX[i], robPositionY[currR-1], robPositionY[i]);
+            if(dist &lt; min_dist &amp;&amp; i != (currR-1) &amp;&amp; !busy[i]) {
+                min_dist = dist;
+                closest = i;
+            }
+        }
+        return closest+1;
+    } else return closest;
+}
+
+bool start;
+void check_start(){
+    int tmp, coR_choice;
+    bool isCoRobotAvailable;
+
+    // if battery charge is low, move to rech. mode
+    if(batteryCharge[currR-1]&lt;=rechargingTh) {
+        dX[currR-1] = rechargeStation[0];
+        dY[currR-1] = rechargeStation[1];
+        coR_choice = select_coR();
+        isCoRobotAvailable = coR_choice &gt; 0;
+        if (isCoRobotAvailable){
+            currOp[currR-1] = 7;
+            coR = coR_choice;
+            //if (currR == 1) coR = 2;
+            //else coR = 1;
+            currOp[coR-1] = 7;
+            dX[coR-1] = robPositionX[currR-1];
+            dY[coR-1] = robPositionY[currR-1];
+            active_robot[coR-1] = true;
+            synch = true;
+        }
+        else{
+            currOp[currR-1] = 2;
+            stop[currR-1] = true;
+        }
+        return;
+    }
+
+    start = getStart(patterns[currH-1]);
+    if(start) {
+        setOpParams(patterns[currH-1]);
+        // human can start if it is a follower, rob is not recharging
+        // and everybody is moving towards the destination (i.e., robot is not going back towards the human)
+        // note: the leader does not need this boolean, because it does not "wait" for start_h_action to fire
+        startHuman = (currOp[currR-1]==4 &amp;&amp; patterns[currH-1]!=2 &amp;&amp; patterns[currH-1]!=3 &amp;&amp;
+        dX[currR-1]==destX[currH-1] &amp;&amp; dY[currR-1]==destY[currH-1]) || currOp[currR-1]==6;
+        stop[currR-1] = true;
+    }
+}
+
+void check_hr_mission(){
+    if (served[currH-1]){
+        stop[currR-1] = true;
+        stopHuman=false;
+        return;
+    }
+    if (batteryCharge[id-1]&lt;=rechargingTh){
+        stop[currR-1]=true;
+        stopHuman=true;
+        return;
+    }
+    if (!hExe) stop[currR-1]=true;
+}
+
+void check_service_provided() {
+    double eps = 200.0, dist_to_dest, humanRobotDist;
+
+    dist_to_dest = pt_dist(robPositionX[currR-1], destX[currH-1], robPositionY[currR-1], destY[currH-1]);
+    humanRobotDist = calculateDistance();
+
+    if(patterns[currH-1]==0
+       &amp;&amp; dist_to_dest &lt;= eps
+                                     &amp;&amp; humanRobotDist &lt;= eps/100*2) { // if follower is close to robot and both are close to destination
+        served[currH-1] = true;
+        stopHuman = true;
+        if(currH&lt;H &amp;&amp; patterns[currH]!=1)
+        currH++;
+    }
+    else if((patterns[currH-1]==1 || patterns[currH-1]==3 || patterns[currH-1]==12) &amp;&amp; served[currH-1]) // if leader has set themselves as served
+        currH++;
+    else if(patterns[currH-1]==10 &amp;&amp; task_size &lt;= task_completion){
+        served[currH-1] = true;
+        stopHuman = true;
+        if(currH&lt;H &amp;&amp; patterns[currH]!=1)
+        currH++;
+    }
+}
+
+/***********coR functions**************/
+
+void check_r_move_coR(){
+    //check if the coR has reached the recharging station
+    double dist_to_dest = pt_dist(robPositionX[coR-1], dX[coR-1], robPositionY[coR-1], dY[coR-1]);
+    double dist = 150.0;
+    stop[coR-1] = dist_to_dest &lt;= dist;
+}
+
+void check_r_rech_coR(){
+    if(batteryCharge[coR-1]&gt;=stopRechargingTh) //if recharging, stop when recharged
+    stop[coR-1] = true;
+}
+
+void needs_recharging_coR(){
+    stop[coR-1] = true;
+    currOp[coR-1] = 2;
+    dX[coR-1] = rechargeStation[0];
+    dY[coR-1] = rechargeStation[1];
+}
+
+
+void check_r_sync(){
+    double dist_to_dest = pt_dist(robPositionX[coR-1], dX[coR-1], robPositionY[currR-1], dY[currR-1]);
+    double dist = 150.0;
+    if (dist_to_dest &lt;= dist) {
+        synch = false;
+        stop[coR-1] = true;
+    }
+}
+
+/**
+* SAFETY DISTANCE ERROR
+**/
+
+void check_crit_op() {
+    double humanRobotDist;
+    humanRobotDist = calculateDistance();
+    is_crit = humanRobotDist &lt;= safetyDistance;
+}
+
+/**
+* MAIN LOOP
+**/
+
+void check_actions() {
+    if (currR == id) {
+        check_scs();
+        if( scs )
+            return;
+
+        check_fail();
+        if( fail )
+            return;
+
+        check_crit_op();
+
+        if( currOp[currR-1]==1 ) // system idle, waiting for an action to start
+            check_start();
+        else if( currOp[currR-1]==2 || currOp[currR-1]==4 ) // robot moving to rech. station (currOp=2), or leading (currOp=4)
+            check_r_move();
+        else if( currOp[currR-1]==3 ) // robot recharging
+            check_r_rech();
+        else if( currOp[currR-1]==5 ) // robot following
+            check_h_move();
+        else if ( currOp[currR-1]==6 )
+            check_hr_mission();
+        else if ( currOp[currR-1]==7 )
+            /*waiting co-robot synchronization*/;
+
+        check_service_provided();
+    }
+    else if (coR == id){
+        if( currOp[currR-1]==1 ) // system idle, waiting for an eventual synchronization with the current robot
+            /*nothing*/;
+        else if ( currOp[coR-1]==2 ) // co-robot moving to rech. station
+            check_r_move_coR();
+        else if ( currOp[coR-1]==3 ) // co-robot recharging
+            check_r_rech_coR();
+        else if ( currOp[coR-1]==4 )
+            needs_recharging_coR();
+        else if ( currOp[coR-1]==7 ) //// co-robot reaching current robot
+            check_r_sync();
+    }
+}
+</declaration>
+    <location id="id157" x="-663" y="-366">
+        <name x="-705" y="-399">op</name>
+        <label kind="invariant" x="-773" y="-374">t_act&lt;=T_int</label>
+    </location>
+    <location id="id158" x="-238" y="-366">
+        <name x="-221" y="-391">chk</name>
+        <label kind="invariant" x="-221" y="-365">t_act&lt;=T_proc</label>
+    </location>
+    <location id="id159" x="-442" y="-527">
+        <name x="-452" y="-561">off</name>
+    </location>
+    <location id="id160" x="-451" y="-222">
+        <committed/>
+    </location>
+    <location id="id161" x="-238" y="-459">
+        <committed/>
+    </location>
+    <location id="id162" x="-136" y="-459">
+        <committed/>
+    </location>
+    <init ref="id159"/>
+    <transition>
+        <source ref="id162"/>
+        <target ref="id159"/>
+        <label kind="synchronisation" x="-195" y="-518">opchk_scs!</label>
+        <nail x="-144" y="-467"/>
+        <nail x="-238" y="-527"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id162"/>
+        <label kind="guard" x="-127" y="-450">!stop[id-1] &amp;&amp; scs
+        &amp;&amp; t_act&gt;=T_proc</label>
+        <label kind="assignment" x="-127" y="-416">active_robot[id-1] = true</label>
+        <nail x="-136" y="-365"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id161"/>
+        <label kind="guard" x="-382" y="-459">stop[id-1] &amp;&amp; !scs
+        &amp;&amp; t_act&gt;=T_proc</label>
+        <label kind="assignment" x="-382" y="-425">active_robot[id-1] = true</label>
+    </transition>
+    <transition>
+        <source ref="id160"/>
+        <target ref="id159"/>
+        <label kind="synchronisation" x="-25" y="-552">opchk_fail!</label>
+        <label kind="assignment" x="-25" y="-527">fail = true</label>
+        <label kind="comments" x="-433" y="-200">active_robot[id-1] is not set true because the synch messagge
+        opchk_fail is not received by anyone</label>
+        <nail x="59" y="-229"/>
+        <nail x="59" y="-527"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id160"/>
+        <label kind="guard" x="-229" y="-314">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-289" y="-255">h_fail?</label>
+        <label kind="assignment" x="-229" y="-297">active_robot[id-1] = false</label>
+        <nail x="-238" y="-263"/>
+    </transition>
+    <transition>
+        <source ref="id157"/>
+        <target ref="id160"/>
+        <label kind="guard" x="-824" y="-314">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-629" y="-246">h_fail?</label>
+        <label kind="assignment" x="-824" y="-297">active_robot[id-1] = false</label>
+        <nail x="-663" y="-263"/>
+    </transition>
+    <transition>
+        <source ref="id161"/>
+        <target ref="id159"/>
+        <label kind="synchronisation" x="-331" y="-501">opchk_stop!</label>
+        <nail x="-238" y="-527"/>
+    </transition>
+    <transition>
+        <source ref="id159"/>
+        <target ref="id157"/>
+        <label kind="guard" x="-748" y="-578">active_robot[id-1] == true &amp;&amp;
+        (currR == id || coR == id)</label>
+        <label kind="synchronisation" x="-697" y="-544">opchk_start?</label>
+        <label kind="assignment" x="-748" y="-527">initialize(), t_act=0,
+        active_robot[id-1] = false</label>
+        <nail x="-663" y="-527"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id160"/>
+        <label kind="guard" x="-229" y="-314">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-365" y="-297">dead_battery?</label>
+        <label kind="assignment" x="-229" y="-297">active_robot[id-1] = false</label>
+        <nail x="-263" y="-280"/>
+    </transition>
+    <transition>
+        <source ref="id157"/>
+        <target ref="id160"/>
+        <label kind="guard" x="-824" y="-314">active_robot[id-1] == true</label>
+        <label kind="synchronisation" x="-629" y="-297">dead_battery?</label>
+        <label kind="assignment" x="-824" y="-297">active_robot[id-1] = false</label>
+        <nail x="-637" y="-280"/>
+    </transition>
+    <transition>
+        <source ref="id158"/>
+        <target ref="id157"/>
+        <label kind="guard" x="-527" y="-340">!stop[id-1] &amp;&amp; !scs
+        &amp;&amp; t_act&gt;=T_proc</label>
+        <label kind="assignment" x="-476" y="-306">t_act=0</label>
+        <nail x="-450" y="-323"/>
+    </transition>
+    <transition>
+        <source ref="id157"/>
+        <target ref="id158"/>
+        <label kind="guard" x="-501" y="-408">t_act&gt;=T_int</label>
+        <label kind="assignment" x="-501" y="-391">check_actions(), t_act=0</label>
+    </transition>
+</template>
+<template>
+    <name>ROS_SensPub</name>
+    <parameter>int id, double l_avg, double l_dev</parameter>
+    <declaration>
+clock L;
+
+double latency = 0.0;
+int buff_pos = 0;
+
+double buffer[MAX_BUFF_SIZE];
+double buffer2[MAX_BUFF_SIZE];
+
+int buffer3[MAX_BUFF_SIZE];
+int cached_id;
+
+void update_lat() {
+    latency = random_normal(l_avg, l_dev);
+}
+
+void add_to_buffer() {
+    cached_id = currH;
+    if(id==0){
+        buffer[buff_pos] = internal_charge[0];
+        buffer3[buff_pos] = 0;
+        if(R&gt;=2) {
+            buff_pos++;
+            buffer[buff_pos] = internal_charge[1];
+            buffer3[buff_pos] = 1;
+        }
+    }
+    else if(id==1) {
+        //update robot position (currR or coR)
+        buffer[buff_pos] = internalRobX[id-1];
+        buffer2[buff_pos] = internalRobY[id-1];
+    }
+    else if(id==2) {
+        buffer[buff_pos] = internalHumX[currH-1];
+        buffer2[buff_pos] = internalHumY[currH-1];
+        buffer3[buff_pos] = -1;
+    }
+    else if(id==3){
+        buffer[buff_pos] = internalFatigue[currH-1];
+        buffer3[buff_pos] = -1;
+    }
+
+    buff_pos += 1;
+}
+
+void shift_buffer(){
+    int i;
+
+    // Shift buffer
+    for(i=0; i&lt;MAX_BUFF_SIZE-1 &amp;&amp; buffer[i+1] &gt; 0.0; i++) {
+        buffer[i] = buffer[i+1];
+        buffer2[i] = buffer2[i+1];
+        buffer3[i] = buffer3[i+1];
+    }
+
+    buffer[i+1] = -1.0;
+    buffer2[i+1] = -1.0;
+    buffer3[i+1] = -1;
+
+    buff_pos = buff_pos-1;
+    if(buff_pos &lt; 0)
+        buff_pos = 0;
+}
+
+void publish() {
+    int i;
+
+    // Publish
+    if(id==0){
+        batteryCharge[buffer3[0]] = buffer[0];
+        shift_buffer();
+        batteryCharge[buffer3[0]] = buffer[0];
+    }
+    else if(id==1) {
+        //update robot position (currR or coR)
+        robPositionX[id-1] = buffer[0];
+        robPositionY[id-1] = buffer2[0];
+        /*shift_buffer();
+        robPositionX[buffer3[0]] = buffer[0];
+        robPositionY[buffer3[0]] = buffer2[0];*/
+    }
+    else if(id==2 &amp;&amp; cached_id==currH)
+        for(i=0; i&lt;H &amp;&amp; SAME_H_IDs[currH-1][i]!=-1; i++) {
+            humanPositionX[SAME_H_IDs[currH-1][i]-1] = buffer[0];
+            humanPositionY[SAME_H_IDs[currH-1][i]-1] = buffer2[0];
+        }
+    else if(id==3 &amp;&amp; cached_id==currH) humanFatigue[currH-1] = buffer[0];
+
+    shift_buffer();
+}
+        </declaration>
+    <location id="id163" x="-34" y="-8">
+        <name x="-42" y="8">idle</name>
+        <label kind="invariant" x="-42" y="25">L'==0</label>
+    </location>
+    <location id="id164" x="-34" y="-195">
+        <name x="-17" y="-204">sending</name>
+        <label kind="invariant" x="-17" y="-187">L &lt;= latency</label>
+    </location>
+    <init ref="id163"/>
+    <transition>
+        <source ref="id164"/>
+        <target ref="id164"/>
+        <label kind="synchronisation" x="-8" y="-289">publish_m[id]?</label>
+        <label kind="assignment" x="17" y="-272">add_to_buffer()</label>
+        <nail x="-34" y="-280"/>
+        <nail x="34" y="-246"/>
+    </transition>
+    <transition>
+        <source ref="id164"/>
+        <target ref="id164"/>
+        <label kind="guard" x="-153" y="-314">L&gt;=latency
+    &amp;&amp; buff_pos&gt;1</label>
+        <label kind="assignment" x="-178" y="-280">publish(),
+    update_lat(),
+    L=0</label>
+        <nail x="-34" y="-280"/>
+        <nail x="-102" y="-238"/>
+    </transition>
+    <transition>
+        <source ref="id164"/>
+        <target ref="id163"/>
+        <label kind="guard" x="-204" y="-144">L&gt;=latency
+    &amp;&amp; buff_pos&lt;=1</label>
+        <label kind="assignment" x="-153" y="-93">publish()</label>
+        <nail x="-93" y="-102"/>
+    </transition>
+    <transition>
+        <source ref="id163"/>
+        <target ref="id164"/>
+        <label kind="synchronisation" x="34" y="-127">publish_m[id]?</label>
+        <label kind="assignment" x="34" y="-110">add_to_buffer(),
+    L=0, update_lat()</label>
+        <nail x="34" y="-102"/>
+    </transition>
+</template>
+	<system>
+// Robot Instances
+r_1 = Robot(1, 67.25573593855312, 67.25573593855312, 2500.00, 510.00);
+b_r_1 = Battery(1, 12.32605665288402);
+r_pub_1 = ROS_SensPub(1, 0.0, 0.00);
+c_pub = ROS_SensPub(0, 0.5, 0.01);
+
+//
+
+// Controller Instances (one for each robot)
+o_1 = Orchestrator(1);
+opchk_1 = OpChk(1, 1, 0);
+
+//
+
+/**
+* MISSION DEFINITION
+**/
+
+// Human Instances
+// -&gt; DEFINE HUMAN PATTERNS
+h_1 = Human_Follower(1, 67.25573593855312, 6, 8, -1, -1);
+h_2 = Human_Leader(2, 100.0, 1, -1, -1, -1);
+h_3 = Human_Leader(3, 100.0, 1, -1, 2, -1);
+h_4 = Human_Leader(4, 67.25573593855312, 6, 8, 1, -1);
+h_5 = Human_Follower(5, 67.25573593855312, 6, 8, 1, -1);
+h_pub_pos = ROS_SensPub(2, 0.5, 0.01);
+h_pub_ftg = ROS_SensPub(3, 0.5, 0.01);
+
+//
+
+system
+h_1,
+h_2,
+h_3,
+h_4,
+h_5,
+r_1,
+b_r_1,
+r_pub_1,
+o_1,
+opchk_1,
+c_pub,
+h_pub_pos,
+h_pub_ftg
+;
+</system>
+<queries>
+</queries>
+</nta>

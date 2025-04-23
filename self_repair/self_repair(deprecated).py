@@ -1,7 +1,7 @@
 import pandas as pd
 import joblib
 from oversampling import lime_based_resampling, random_oversampling, smote_oversampling
-from validation import validate_configurations
+from configuration_validation import validate_configurations
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 import numpy as np
