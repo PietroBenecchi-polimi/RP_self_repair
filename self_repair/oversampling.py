@@ -4,7 +4,7 @@ from self_repair.LIME import explain_prediction_with_lime
 import smogn
 import json
 from utils.datacleaner import get_transformation_rules
-from utils.rp_logger import logger
+from sklearn.neighbors import KernelDensity
 
 with open('data/hmtfactor_config.json', 'r') as file:
     factors = dict(json.load(file))
@@ -20,13 +20,13 @@ def smote_oversampling(df: pd.DataFrame):
     )
     return pd.DataFrame(df_resampled)
 
-def random_oversampling(df, samples_per_configuration=1):
+def random_oversampling(df, n_samples = 100):
     synthetic_data = {}
     transformation_rules = get_transformation_rules()
 
     for factor_key in df.columns:
         if factor_key == "SCS":
-            synthetic_data[factor_key] = np.random.uniform(0,1, len(df) * samples_per_configuration)
+            synthetic_data[factor_key] = np.random.uniform(0,1, n_samples)
         elif factor_key not in transformation_rules.keys():
             if "PRGS" == factor_key:
                 synthetic_data[factor_key] = np.random.choice([0,1,2,3,4,5])
@@ -38,14 +38,14 @@ def random_oversampling(df, samples_per_configuration=1):
                 elif "max" in factors[factor_key]:
                     col_max, col_min = factors[factor_key]["max"], factors[factor_key]["min"]
 
-                synthetic_data[factor_key] = np.random.uniform(col_min, col_max, len(df) * samples_per_configuration)
+                synthetic_data[factor_key] = np.random.uniform(col_min, col_max, n_samples)
         else:
             values = list(transformation_rules[factor_key].values())
-            synthetic_data[factor_key] = np.random.choice(values, len(df) * samples_per_configuration)
+            synthetic_data[factor_key] = np.random.choice(values, n_samples)
 
     return pd.DataFrame(synthetic_data)
 
-def lime_based_resampling(df: pd.DataFrame, regressor, samples_per_configuration=1):
+def lime_based_resampling(df: pd.DataFrame, regressor, n_samples=100):
     df = df.drop(columns=["SCS"]) if "SCS" in df.columns else df
     new_samples = []
     epsilon = 1e-5  # to avoid division by zero
@@ -55,7 +55,7 @@ def lime_based_resampling(df: pd.DataFrame, regressor, samples_per_configuration
 
     for index in range(df.shape[0]):
         # For each original sample, generate multiple new samples as per samples_per_configuration
-        for _ in range(samples_per_configuration):
+        for _ in range(n_samples):
             new_sample = df.iloc[index].copy()
             for feature in new_sample.keys():
                 mean = float(new_sample[feature])  # Ensure mean is a float
@@ -88,3 +88,29 @@ def lime_based_resampling(df: pd.DataFrame, regressor, samples_per_configuration
             new_samples.append(new_sample)
     
     return pd.DataFrame(new_samples)
+
+def kde_lime_based_resampling(df: pd.DataFrame, n_samples=100):
+    df = df.drop(columns=["SCS"], errors='ignore')
+    transformation_rules = get_transformation_rules()
+
+    # Fit a KDE for each feature
+    feature_samples = {}
+
+    for feature in df.columns:
+        if feature not in transformation_rules:
+            kde = KernelDensity(kernel='gaussian', bandwidth=0.2)
+            kde.fit(df[[feature]])
+            # Sample n_samples all at once
+            samples = kde.sample(n_samples).flatten()
+            feature_samples[feature] = samples
+        else:
+            # Handle categorical features separately
+            values = np.array(list(transformation_rules[feature].values()), dtype=float)
+            probs = np.ones(len(values)) / len(values)
+            samples = np.random.choice(values, size=n_samples, p=probs)
+            feature_samples[feature] = samples
+
+    # Build DataFrame from sampled features
+    new_df = pd.DataFrame(feature_samples)
+
+    return new_df
