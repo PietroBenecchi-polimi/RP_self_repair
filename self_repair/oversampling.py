@@ -5,7 +5,8 @@ import smogn
 import json
 from utils.datacleaner import get_transformation_rules
 from utils.rp_logger import logger
-with open('datasets/hmtfactor_config.json', 'r') as file:
+
+with open('data/hmtfactor_config.json', 'r') as file:
     factors = dict(json.load(file))
 
 # Synthetic Minority Over-Sampling Technique for Regression with Gaussian Noise 

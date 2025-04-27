@@ -20,9 +20,10 @@ def load_existing_results(save_path: str) -> List[Dict]:
             return json.load(f)
     return []
 
-def run_experiments(regressor_points: List[int], resampling_points: List[int], invalid_configs_validation: bool) -> List[Dict]:
+def run_experiments(regressor_points: List[int], resampling_points: List[int], invalid_configs_validation: str) -> List[Dict]:
     """Run the oversampling pipeline for different parameter combinations."""
-    save_path = f"tester/data/oversampling_results_{'invalid_configs' if invalid_configs_validation else 'first_configs'}.json"
+    
+    save_path = f"tester_results/data/oversampling_results_{'invalid_configs' if invalid_configs_validation else 'first_configs'}.json"
     stats_per_points = load_existing_results(save_path)
     existing_combinations = {(d['regressor_points'], d['resampling_points']) 
                             for d in stats_per_points if 'regressor_points' in d}
@@ -37,7 +38,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], i
             stats = run_oversampling_pipeline(
                 n_data_to_verify=100,
                 n_samples=s_points,
-                final_validation_invalid_configs=invalid_configs_validation,
+                data_type_second_validation=invalid_configs_validation,
                 points_regressor=r_points,
                 skip_cache=True
             )
@@ -125,7 +126,7 @@ def visualize_comparison_violin(df_invalid: pd.DataFrame, df_standard: pd.DataFr
     plt.grid(True, axis='y', linestyle=':', alpha=0.7)
     plt.legend(title='Validation Type')
     plt.tight_layout()
-    plt.savefig(f"tester/figs/combined_violin_r{r_points}_s{s_points}.png", dpi=300)
+    plt.savefig(f"tester_results/figs/combined_violin_r{r_points}_s{s_points}.png", dpi=300)
     plt.show()
     
 def visualize_comparison_box(df_invalid: pd.DataFrame, df_standard: pd.DataFrame, r_points: int, s_points: int) -> None:
@@ -161,7 +162,7 @@ def visualize_comparison_box(df_invalid: pd.DataFrame, df_standard: pd.DataFrame
     plt.grid(True, axis='y', linestyle=':', alpha=0.7)
     plt.legend(title='Validation Type')
     plt.tight_layout()
-    plt.savefig(f"tester/figs/combined_box_r{r_points}_s{s_points}.png", dpi=300)
+    plt.savefig(f"tester_results/figs/combined_box_r{r_points}_s{s_points}.png", dpi=300)
     plt.show()
 
 def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame) -> None:
@@ -201,7 +202,7 @@ def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame) -> None:
 
         plt.suptitle(f"Epsilon vs. Resampling Points ({v_type})", fontsize=16)
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        filename = f"tester/figs/epsilon_trend_{v_type.replace(' ', '_').lower()}.png"
+        filename = f"tester_results/figs/epsilon_trend_{v_type.replace(' ', '_').lower()}.png"
         plt.savefig(filename, dpi=300)
         plt.show()
 
@@ -209,8 +210,8 @@ def main():
     regressor_points = [5, 10, 30, 50]
     resampling_points = [30, 50, 100]
 
-    standard_stats = run_experiments(regressor_points, resampling_points, False)
-    invalid_stats = run_experiments(regressor_points, resampling_points, True)
+    standard_stats = run_experiments(regressor_points, resampling_points, "first_verification")
+    invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs")
 
     df_standard = process_results(standard_stats)
 

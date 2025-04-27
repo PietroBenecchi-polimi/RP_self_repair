@@ -52,8 +52,12 @@ def main(input_csv_path: str, output_filename: str):
 
     logger.info(f"Transformation complete. Output saved to: {output_path}")
 
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python transform_data.py <input_csv_path> <output_filename>")
-    else:
-        main(sys.argv[1], sys.argv[2])
+def prepare_dataset(data_path) -> pd.DataFrame:
+    data = pd.read_csv(data_path)
+    
+    data = data.drop(["PRSCS_LB","PRSCS_UB","FTG_HUM_1_LB","FTG_HUM_1_UB",
+                     "FTG_HUM_1","FTG_HUM_2_LB","FTG_HUM_2_UB","FTG_HUM_2"], axis =1)
+    
+    data = categorical_to_numeric(data)
+    
+    return data

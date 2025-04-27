@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import SGDRegressor
 from sklearn.base import clone
 import numpy as np
-import utils as ut
+import utils.datacleaner as ut
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
@@ -104,7 +104,7 @@ def train_new_regressor(training_set: pd.DataFrame):
 def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_validation, points_regressor, skip_cache = True):
     logger.info(f"Configuration: dataset_size:{n_data_to_verify}, oversampling size:{n_samples}, Second validation is with: {data_type_second_validation}")
     #Training dataset
-    data_path = "datasets/dataset1000.csv"
+    data_path = "data/dataset1000.csv"
     dataset = ut.prepare_dataset(data_path)
 
     # Model checker, ground truth regressor
@@ -115,7 +115,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     regressor = train_new_regressor(dataset)
 
     # Transformation rules for dataset
-    data_path = "datasets/initial_configurations_to_improve.csv"
+    data_path = "data/initial_configurations_to_improve.csv"
     verification_dataset = ut.prepare_dataset(data_path)
 
     # Divide dataset for verification

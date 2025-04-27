@@ -101,7 +101,7 @@ def optimize_configurations(
     if df.isnull().values.any():
         raise ValueError("Input DataFrame contains NaN values. Please clean the data.")
 
-    regressor_FTG = joblib.load("self_repair/regressor/regressor_FTG.joblib")
+    regressor_FTG = joblib.load("./self_repair/regressors/regressor_FTG.joblib")
     time_records = []
     results = []
 
