@@ -165,7 +165,7 @@ def visualize_comparison_box(df_invalid: pd.DataFrame, df_standard: pd.DataFrame
     plt.savefig(f"tester_results/figs/combined_box_r{r_points}_s{s_points}.png", dpi=300)
     plt.show()
 
-def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame) -> None:
+def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame):
     """Plot epsilon vs. resampling points separately for each validation type."""
     validation_types = df_combined['Validation Type'].unique()
 
@@ -206,15 +206,70 @@ def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame) -> None:
         plt.savefig(filename, dpi=300)
         plt.show()
 
+
+def create_maxplot(df_standard: pd.DataFrame):
+    """Create maxplot for each oversampling method comparing standard and invalid configs."""
+    fig, axes = plt.subplots(df_standard['method'].__len__ , 1, figsize=(10, 8))  # 2x2 grid of subplots
+
+    # Loop through each method and generate a maxplot
+    for i, method in enumerate(df_standard['method']):
+        epsilon_array = df_standard['stats']['epsilon_array'] 
+
+        # Plot each boxplot in a separate subplot
+        axes[i, 0].boxplot(epsilon_array)
+
+        # Add labels and title
+        axes[i, 0].title('Boxplot for ' + method)
+        axes[i, 0].xlabel('Oversampling Method ' + method)
+        axes[i, 0].ylabel('Epsilon')
+        
+        # Save and show
+        filename = f"tester_results/figs/boxplotForResamplingMethods.png"
+        plt.savefig(filename, dpi=300)
+        plt.show()
+
+def create_maxplot(df_standard: pd.DataFrame):
+    """Create maxplot for each oversampling method comparing standard and invalid configs."""
+    # Create a figure with a number of subplots equal to the number of methods
+    fig, axes = plt.subplots(len(df_standard['method']), 1, figsize=(10, 8))
+
+    # Loop through each method and generate a maxplot
+    for i, method in enumerate(df_standard['method']):
+        epsilon_array = df_standard['stats'][i]['epsilon_array']  
+
+        # Plot each boxplot in a separate subplot
+        axes[i].boxplot(epsilon_array)
+
+        # Add labels and title
+        axes[i].set_title(f'Boxplot for {method}')
+        axes[i].set_xlabel(f'Oversampling Method: {method}')
+        axes[i].set_ylabel('Epsilon')
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+    # Save the figure with all subplots to a single file
+    filename = "tester_results/figs/boxplotForResamplingMethods.png"
+    plt.savefig(filename, dpi=300)
+
+    # Show the plot
+    plt.show()
+
 def main():
     regressor_points = [5, 10, 30, 50]
     resampling_points = [30, 50, 100]
 
+    # Perform oversmapling pipeline:
+    # 1. First validation 
+    # 2. Oversmapling 
+    # 3. Second validation: It can be invalid configs or standard(first validation)
     standard_stats = run_experiments(regressor_points, resampling_points, "first_verification")
     invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs")
 
-    df_standard = process_results(standard_stats)
+    # Create a MaxPlot of epsilon over resampling points
 
+    # Process results into DataFrames
+    df_standard = process_results(standard_stats)
     df_invalid = process_results(invalid_stats)
     
     df_invalid['Validation Type'] = 'Invalid Configs'
@@ -222,10 +277,13 @@ def main():
 
     for r in regressor_points:
         for s in resampling_points:
+            # Filter the DataFrames for the current combination of regressor and resampling points
             df_s = df_standard[(df_standard['Regressor Points'] == r) & (df_standard['Resampling Points'] == s)]
             df_i = df_invalid[(df_invalid['Regressor Points'] == r) & (df_invalid['Resampling Points'] == s)]
+            # Check if both DataFrames are not empty before plotting
             if not df_s.empty and not df_i.empty:
                 visualize_comparison_violin(df_i, df_s, r_points=r, s_points=s)
+                
     # Combine for general plotting
     df_combined = pd.concat([df_standard, df_invalid])
     plot_epsilon_over_resampling_points(df_combined)

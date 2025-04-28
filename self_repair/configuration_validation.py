@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+
 def validate_scs(opt_SCS, mc_SCS):
     epsilon = np.abs(opt_SCS - mc_SCS)
     return epsilon < 0.1, epsilon
