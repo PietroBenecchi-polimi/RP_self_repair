@@ -89,7 +89,7 @@ def lime_based_resampling(df: pd.DataFrame, regressor, n_samples=100):
     
     return pd.DataFrame(new_samples)
 
-def kde_lime_based_resampling(df: pd.DataFrame, n_samples=100):
+def kde_based_resampling(df: pd.DataFrame, n_samples=100):
     df = df.drop(columns=["SCS"], errors='ignore')
     transformation_rules = get_transformation_rules()
 

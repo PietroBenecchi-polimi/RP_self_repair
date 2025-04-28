@@ -204,10 +204,9 @@ def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame) -> None:
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         filename = f"tester_results/figs/epsilon_trend_{v_type.replace(' ', '_').lower()}.png"
         plt.savefig(filename, dpi=300)
-        plt.show()
 
 def main():
-    regressor_points = [5, 10, 30, 50]
+    regressor_points = [100, 150, 300, 500]
     resampling_points = [30, 50, 100]
 
     standard_stats = run_experiments(regressor_points, resampling_points, "first_verification")

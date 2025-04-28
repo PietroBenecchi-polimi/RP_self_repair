@@ -1,5 +1,5 @@
 import pandas as pd
-from self_repair.oversampling import lime_based_resampling, random_oversampling, smote_oversampling
+from self_repair.oversampling import lime_based_resampling, random_oversampling, smote_oversampling, kde_based_resampling
 from self_repair.configuration_validation import validate_configurations
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
@@ -8,6 +8,7 @@ import multiprocessing
 import time
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import SGDRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.base import clone
 import numpy as np
 import utils.datacleaner as ut
@@ -16,17 +17,20 @@ warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
 from self_repair.mc_opt_interface import *
 
-def oversample_method(method_name: str, invalid_configs: pd.DataFrame, regressor=None, previous_configs: pd.DataFrame = None) -> Dict:
+def oversample_method(method_name: str, invalid_configs: pd.DataFrame, regressor=None, previous_configs: pd.DataFrame = None, n_samples: int = 100) -> Dict:
     try:
         if method_name == "Random":
-            new_samples = random_oversampling(df=invalid_configs)
+            new_samples = random_oversampling(df=invalid_configs, n_samples=n_samples)
             new_samples["SCS"] = 0
         elif method_name == "Smote":
             new_samples = smote_oversampling(df=invalid_configs)
         elif method_name == "Smote-2":
             new_samples = smote_oversampling(df=previous_configs)
         elif method_name == "LIME_gaussian":
-            new_samples = lime_based_resampling(df=invalid_configs, regressor=regressor)
+            new_samples = lime_based_resampling(df=invalid_configs, regressor=regressor, n_samples=n_samples)
+            new_samples["SCS"] = 0
+        elif method_name == "KDE":
+            new_samples = kde_based_resampling(df=invalid_configs, n_samples=n_samples)
             new_samples["SCS"] = 0
         else:
             raise ValueError(f"Unknown oversampling method: {method_name}")
@@ -41,19 +45,16 @@ def oversample_method(method_name: str, invalid_configs: pd.DataFrame, regressor
         return {"method": method_name, "error": True, "message": str(e)}
 
 def oversampling_methods_parallel(invalid_configs: pd.DataFrame, previous_configs: pd.DataFrame = None, n_samples=100, regressor=None) -> Dict:
-    # Samples from invalid configurations
-    samples = invalid_configs.sample(n=n_samples, random_state=42) if len(invalid_configs) > n_samples else invalid_configs
-    previous_configs = previous_configs.sample(n=n_samples, random_state=42) if len(previous_configs) > n_samples else previous_configs
     # Create list of oversampling methods
-    methods = ["Smote", "Smote-2", "Random","LIME_gaussian"]
+    methods = ["Smote", "Smote-2", "Random","LIME_gaussian", "KDE"]
     
     # Use multiprocessing to parallelize oversampling methods
     with multiprocessing.Pool(processes=len(methods)) as pool:
         results = pool.starmap(
             oversample_method,
             [
-                (method, samples, regressor, previous_configs) if method == "Smote-2"
-                else (method, samples, regressor)
+                (method, invalid_configs, regressor, previous_configs, n_samples) if method == "Smote-2"
+                else (method, invalid_configs, regressor)
                 for method in methods
             ]
         )
@@ -95,7 +96,7 @@ def train_new_regressor(training_set: pd.DataFrame):
     X_train = training_set.drop(columns=["SCS"])
     y_train = training_set["SCS"]
 
-    regressor = SGDRegressor(random_state=42)
+    regressor = RandomForestRegressor(random_state=42)
     regressor.fit(X_train, y_train)
 
     logger.debug("New regressor trained successfully")
@@ -164,7 +165,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
         second_validation_results = opt_optimization(second_test, regressor, f"invalid_configs_validation_{points_regressor}", skip_cache)
         ground_truth_second_verificatation = mc_results_from_configs(second_validation_results.drop(columns=["SCS"]), ground_truth_regressor)
         _, epsilon_array = validate_configurations(second_validation_results, ground_truth_second_verificatation)
-        
+    
     stats.append({"method": "no oversampling - second verification", "epsilon_array": epsilon_array})
 
     end_time = time.time()
