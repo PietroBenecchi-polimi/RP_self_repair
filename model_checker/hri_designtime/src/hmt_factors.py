@@ -61,7 +61,6 @@ def run_mc_simulations(dataframe: pd.DataFrame = None):
 
     N = N if N >= 0 else len(configurations)
 
-
     for i, conf in enumerate(configurations[:N]):
         LOGGER.info('Processing conf {}...'.format(i))
 
@@ -91,7 +90,7 @@ def run_mc_simulations(dataframe: pd.DataFrame = None):
 
         # Run Uppaal Experiment
         out_file = upp_mgr.run_exp(SCENARIO_NAME)
-
+        
         try:
             factor_mgr.save_metrics(conf, out_file)
         except IndexError:

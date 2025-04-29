@@ -259,8 +259,8 @@ def main():
     resampling_points = [30, 50, 100]
 
     # Perform oversmapling pipeline:
-    # 1. First validation 
-    # 2. Oversmapling 
+    # 1. First validation
+    # 2. Oversmapling
     # 3. Second validation: It can be invalid configs or standard(first validation)
     standard_stats = run_experiments(regressor_points, resampling_points, "first_verification")
     invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs")

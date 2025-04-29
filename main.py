@@ -170,7 +170,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
 
     end_time = time.time()
     logger.debug("Oversampling and validation process completed")
-    logger.debug(f"Parallel processing took {end_time - start_time:.2f} seconds")
+    logger.debug(f"Parallel processing took {end_time - start_time:.2f} seconds a.k.a {(end_time - start_time) / 60:.2f} minutes")
 
     # Statistics about resampling
     stats.extend(results)
