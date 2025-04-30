@@ -20,10 +20,10 @@ def load_existing_results(save_path: str) -> List[Dict]:
             return json.load(f)
     return []
 
-def run_experiments(regressor_points: List[int], resampling_points: List[int], invalid_configs_validation: str) -> List[Dict]:
+def run_experiments(regressor_points: List[int], resampling_points: List[int], invalid_configs_validation: str, test_name: str) -> List[Dict]:
     """Run the oversampling pipeline for different parameter combinations."""
-    
-    save_path = f"tester_results/data/oversampling_results_{'invalid_configs' if invalid_configs_validation else 'first_configs'}.json"
+    save_path = f"tester_results/data/data_{test_name}/oversampling_results_{invalid_configs_validation}.json"
+    os.makedirs(f"tester_results/data/data_{test_name}", exist_ok=True)
     stats_per_points = load_existing_results(save_path)
     existing_combinations = {(d['regressor_points'], d['resampling_points']) 
                             for d in stats_per_points if 'regressor_points' in d}
@@ -97,7 +97,7 @@ def add_mean_lines(ax, df):
     if handles:
         ax.legend(handles, labels, loc='upper right', framealpha=1)
 
-def visualize_comparison_violin(df_invalid: pd.DataFrame, df_standard: pd.DataFrame, r_points: int, s_points: int) -> None:
+def visualize_comparison_violin(df_invalid: pd.DataFrame, df_standard: pd.DataFrame, r_points: int, s_points: int, test_name:str) -> None:
     """Create a split violin plot showing both validation types for a specific configuration."""
     df_invalid = df_invalid.copy()
     df_standard = df_standard.copy()
@@ -118,7 +118,7 @@ def visualize_comparison_violin(df_invalid: pd.DataFrame, df_standard: pd.DataFr
             ax.plot([xpos + offset - 0.05, xpos + offset + 0.05],
                     [mean_val, mean_val],
                     color='red', linewidth=2)
-
+    
     plt.title(f"Validation Comparison — Regressor: {r_points}, Resampling: {s_points}", fontsize=14)
     plt.xlabel("Oversampling Method", fontsize=12)
     plt.ylabel("Epsilon", fontsize=12)
@@ -126,10 +126,11 @@ def visualize_comparison_violin(df_invalid: pd.DataFrame, df_standard: pd.DataFr
     plt.grid(True, axis='y', linestyle=':', alpha=0.7)
     plt.legend(title='Validation Type')
     plt.tight_layout()
-    plt.savefig(f"tester_results/figs/combined_violin_r{r_points}_s{s_points}.png", dpi=300)
+    os.makedirs(f"tester_results/figs/figs_{test_name}", exist_ok=True)
+    plt.savefig(f"tester_results/figs/figs_{test_name}/combined_violin_r{r_points}_s{s_points}.png", dpi=300)
     plt.show()
     
-def visualize_comparison_box(df_invalid: pd.DataFrame, df_standard: pd.DataFrame, r_points: int, s_points: int) -> None:
+def visualize_comparison_box(df_invalid: pd.DataFrame, df_standard: pd.DataFrame, r_points: int, s_points: int, test_name: str) -> None:
     """Create a box plot showing both validation types for a specific configuration."""
     df_invalid = df_invalid.copy()
     df_standard = df_standard.copy()
@@ -162,10 +163,11 @@ def visualize_comparison_box(df_invalid: pd.DataFrame, df_standard: pd.DataFrame
     plt.grid(True, axis='y', linestyle=':', alpha=0.7)
     plt.legend(title='Validation Type')
     plt.tight_layout()
-    plt.savefig(f"tester_results/figs/combined_box_r{r_points}_s{s_points}.png", dpi=300)
+    os.makedirs(f"tester_results/figs/figs_{test_name}", exist_ok=True)
+    plt.savefig(f"tester_results/figs/figs_{test_name}/combined_box_r{r_points}_s{s_points}.png", dpi=300)
     plt.show()
 
-def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame):
+def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame, test_name: str):
     """Plot epsilon vs. resampling points separately for each validation type."""
     validation_types = df_combined['Validation Type'].unique()
 
@@ -202,8 +204,9 @@ def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame):
 
         plt.suptitle(f"Epsilon vs. Resampling Points ({v_type})", fontsize=16)
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        filename = f"tester_results/figs/epsilon_trend_{v_type.replace(' ', '_').lower()}.png"
-        plt.savefig(filename, dpi=300)
+        filename = f"epsilon_trend_{v_type.replace(' ', '_').lower()}"
+        os.makedirs(f"tester_results/figs/figs_{test_name}", exist_ok=True)
+        plt.savefig(f"tester_results/figs/figs_{test_name}/{filename}.png", dpi=300)
 
 
 def create_maxplot(df_standard: pd.DataFrame):
@@ -257,13 +260,16 @@ def create_maxplot(df_standard: pd.DataFrame):
 def main():
     regressor_points = [100, 150, 300, 500]
     resampling_points = [30, 50, 100]
-
+    test_name : str = input("Insert test name (Format is test_name): ")
+    if(len(test_name.split(" ")) > 1):
+        logger.error("Invalid test name, please use the suggested format")
+        return
     # Perform oversmapling pipeline:
     # 1. First validation
     # 2. Oversmapling
     # 3. Second validation: It can be invalid configs or standard(first validation)
-    standard_stats = run_experiments(regressor_points, resampling_points, "first_verification")
-    invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs")
+    standard_stats = run_experiments(regressor_points, resampling_points, "first_verification", test_name=test_name)
+    invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs", test_name=test_name)
 
     # Create a MaxPlot of epsilon over resampling points
 
@@ -281,11 +287,11 @@ def main():
             df_i = df_invalid[(df_invalid['Regressor Points'] == r) & (df_invalid['Resampling Points'] == s)]
             # Check if both DataFrames are not empty before plotting
             if not df_s.empty and not df_i.empty:
-                visualize_comparison_violin(df_i, df_s, r_points=r, s_points=s)
+                visualize_comparison_violin(df_i, df_s, r_points=r, s_points=s, test_name=test_name)
                 
     # Combine for general plotting
     df_combined = pd.concat([df_standard, df_invalid])
-    plot_epsilon_over_resampling_points(df_combined)
+    plot_epsilon_over_resampling_points(df_combined, test_name=test_name)
 
 if __name__ == "__main__":
     from multiprocessing import freeze_support

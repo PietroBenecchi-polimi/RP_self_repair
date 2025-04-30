@@ -60,9 +60,15 @@ def run_mc_simulations(dataframe: pd.DataFrame = None):
     LOGGER.info('{} Configurations to process.'.format(len(configurations)))
 
     N = N if N >= 0 else len(configurations)
+    queries_copy = json_mgr.queries.copy()
 
     for i, conf in enumerate(configurations[:N]):
         LOGGER.info('Processing conf {}...'.format(i))
+
+        to_be_processed = [m.m_id for j, m in enumerate(conf.metrics) if j not in conf.processed()]
+        LOGGER.info('Configuration {}: {} to be estimated.'.format(i, ','.join(to_be_processed)))
+        to_be_processed = [x.split('_')[0] for x in to_be_processed]
+        factor_mgr.filter_queries(to_be_processed, queries_copy)
 
         SCENARIO_NAME = '{}_{}'.format(SCENARIO, i)
 

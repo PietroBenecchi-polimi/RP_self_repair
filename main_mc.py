@@ -66,3 +66,4 @@ if __name__ == "__main__":
     data = pd.read_csv("data/initial_configurations_to_improve.csv")
     data_frame = mc_results_from_configs(data)
     data_frame.to_csv("data/processed_dataset.csv", index=False)
+    
