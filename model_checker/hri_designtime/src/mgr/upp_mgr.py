@@ -25,7 +25,7 @@ class Upp_Mgr:
         ts = datetime.now()
         ts_split = str(ts).split('.')[0]
         ts_str = ts_split.replace('-', '_')
-        ts_str = ts_str.replace(' ', '_')
+        ts_str = ts_str.replace(' ', '_').replace(':', '_')
         return ts_str
 
     def run_exp(self, scen_name):
