@@ -3,12 +3,9 @@ from datetime import datetime
 from enum import Enum
 
 config = configparser.ConfigParser()
-try:
-    config.read('./model_checker/hri_designtime/resources/config/config.ini')
-    config.sections()
-except FileNotFoundError:
-    print("Error: Configuration file not found. Please ensure the file exists at the specified path.")
-    config = None
+config.read('./model_checker/hri_designtime/resources/config/config.ini')
+config.sections()
+
 
 class LogLevel(Enum):
     DEBUG = 1

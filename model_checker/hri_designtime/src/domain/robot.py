@@ -1,4 +1,4 @@
-from src.domain.layout import Point
+from model_checker.hri_designtime.src.domain.layout import Point
 
 
 class Robot:

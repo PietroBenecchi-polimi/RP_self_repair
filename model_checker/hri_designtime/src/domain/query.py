@@ -1,8 +1,8 @@
 from enum import Enum
 from typing import List
 
-from src.domain.human import Human
-from src.domain.robot import Robot
+from model_checker.hri_designtime.src.domain.human import Human
+from model_checker.hri_designtime.src.domain.robot import Robot
 
 ND = -1
 

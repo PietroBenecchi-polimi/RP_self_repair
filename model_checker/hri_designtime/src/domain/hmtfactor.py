@@ -5,8 +5,8 @@ from typing import List, Tuple, Any, Dict
 
 import numpy as np
 
-from src.domain.human import Fatigue_Profile, FreeWill_Profile
-from src.domain.layout import Point
+from model_checker.hri_designtime.src.domain.human import Fatigue_Profile, FreeWill_Profile
+from model_checker.hri_designtime.src.domain.layout import Point
 
 
 class HMTFactor:

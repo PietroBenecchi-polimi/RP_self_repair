@@ -13,7 +13,7 @@ config = configparser.ConfigParser()
 config.read('./model_checker/hri_designtime/resources/config/config.ini')
 config.sections()
 
-SCENARIO_NAME = "hmtfactor_config"
+SCENARIO_NAME = "Dpa"
 
 class Json_Mgr:
     JSON_PATH = config['PARAMS SETTINGS']['PARAMS_PATH']

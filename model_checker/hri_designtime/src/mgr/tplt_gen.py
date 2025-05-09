@@ -1,10 +1,10 @@
 import configparser
 import os
 
-from model_checker.hri_designtime.src.logging.logger import Logger
+from src.logging.logger import Logger
 
 config = configparser.ConfigParser()
-config.read('./model_checker/hri_designtime/resources/config/config.ini')
+config.read('./resources/config/config.ini')
 config.sections()
 
 PCKGS_PATH = config['TEMPLATES SETTING']['TEMPLATE_GEN']
