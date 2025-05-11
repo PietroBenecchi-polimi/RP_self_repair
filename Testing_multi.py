@@ -1,4 +1,4 @@
-from main import run_oversampling_pipeline
+from self_repair.self_repair_multi import run_oversampling_pipeline
 import matplotlib.pyplot as plt
 import json
 import os

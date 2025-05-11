@@ -13,7 +13,7 @@ import time
 from sklearn.model_selection import train_test_split
 import numpy as np
 import utils as ut
-import main 
+import self_repair.self_repair_multi as self_repair_multi 
 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
