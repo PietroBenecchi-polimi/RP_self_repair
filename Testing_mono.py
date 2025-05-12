@@ -41,7 +41,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], i
                 n_samples=s_points,
                 data_type_second_validation=invalid_configs_validation,
                 points_regressor=r_points,
-                skip_cache=True
+                skip_cache=False,
             )
 
             stats_per_points.append({
@@ -54,15 +54,15 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], i
     return stats_per_points
 
 def main():
-    regressor_points = [100]
-    resampling_points = [30]
-    if len(sys.argv) < 2:
-        logger.error("Please, insert the correct number of arguments")
-        return 
-    test_name : str = sys.argv[1]
-    if(len(test_name.split(" ")) > 1):
-        logger.error("Invalid test name, please use the suggested format")
-        return
+    regressor_points = [100, 150, 300, 500]
+    resampling_points = [10, 15, 30, 50, 100]
+    #if len(sys.argv) < 2:
+    #    logger.error("Please, insert the correct number of arguments")
+    #    return 
+    test_name : str = "model_checker"
+    #if(len(test_name.split(" ")) > 1):
+    #    logger.error("Invalid test name, please use the suggested format")
+    #    return
     # Perform oversmapling pipeline:
     # 1. First validation
     # 2. Oversmapling

@@ -1,7 +1,4 @@
 import pandas as pd
-import os
-import sys
-from utils.rp_logger import logger
 
 # Transformation rules
 transform_rules = {
@@ -35,23 +32,6 @@ def numeric_to_categorical(df: pd.DataFrame) -> pd.DataFrame:
             df_copy[column] = df_copy[column].map(mapping)
     return df_copy
 
-def main(input_csv_path: str, output_filename: str):
-    logger.info(f"Loading input data from: {input_csv_path}")
-
-    # Load data
-    df_input = pd.read_csv(input_csv_path)
-
-    # Transform
-    df_transformed = categorical_to_numeric(df_input)
-
-    # Save to specified output file
-    output_dir = './datasets'
-    output_path = os.path.join(output_dir, output_filename)
-    os.makedirs(output_dir, exist_ok=True)
-    df_transformed.to_csv(output_path, index=False)
-
-    logger.info(f"Transformation complete. Output saved to: {output_path}")
-
 def prepare_dataset(data_path) -> pd.DataFrame:
     data = pd.read_csv(data_path)
     
@@ -61,3 +41,38 @@ def prepare_dataset(data_path) -> pd.DataFrame:
     data = categorical_to_numeric(data)
     
     return data
+
+def fromMCtoOptimizer(data) -> pd.DataFrame:
+    data['SCS'] = data['PRSCS_LOWER_BOUND'] + data['PRSCS_UPPER_BOUND'] / 2
+
+    # Split AGE/STAT columns back into original components
+    data['HUM_1_FTG'] = data['HUM_1_FTG'].astype(str)
+    data['HUM_2_FTG'] = data['HUM_2_FTG'].astype(str)
+
+    data[['HUM_1_AGE', 'HUM_1_STA']] = data['HUM_1_FTG'].str.split('/', expand=True)
+    data[['HUM_2_AGE', 'HUM_2_STA']] = data['HUM_2_FTG'].str.split('/', expand=True)
+    
+    data = data.rename(columns={'PROGRESS': 'PRGS'})
+
+    # Split Position columns back into original X and Y
+    data['HUM_1_POS'] = data['HUM_1_POS'].astype(str)
+    data['HUM_2_POS'] = data['HUM_2_POS'].astype(str)
+
+    data[['HUM_1_POS_X', 'HUM_1_POS_Y']] = data['HUM_1_POS'].str.split(', ', expand=True).astype(float)
+    data[['HUM_2_POS_X', 'HUM_2_POS_Y']] = data['HUM_2_POS'].str.split(', ', expand=True).astype(float)
+
+    # Drop combined columns
+    data.drop(columns=['HUM_1_FTG', 'HUM_2_FTG', 'HUM_1_POS', 'HUM_2_POS'], inplace=True)
+
+    # Remove placeholder columns
+    data.drop(columns=['PRSCS_LOWER_BOUND', 'PRSCS_UPPER_BOUND', 'FTG_HUM_1', 'FTG_HUM_2'], inplace=True)
+
+    data = categorical_to_numeric(data) 
+    
+    return data
+
+    
+if __name__ == "__main__":
+    results = pd.read_csv("mc_results.csv")
+    results = fromMCtoOptimizer(results)
+    results.to_csv("mc_results_transformed.csv", index=False)

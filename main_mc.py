@@ -31,9 +31,6 @@ def process_data(data):
 
     data.drop(columns=['HUM_1_POS_X', 'HUM_1_POS_Y', 'HUM_2_POS_X', 'HUM_2_POS_Y', 'HUM_1_AGE', 'HUM_2_AGE',
                       'HUM_1_STA', 'HUM_2_STA'], inplace=True) 
-    #Predicted columns drop
-    #data.drop(columns=['PRSCS_LB', 'PRSCS_UB', 'SCS', 'FTG_HUM_1_LB', 'FTG_HUM_1_UB', 'FTG_HUM_1',
-    #                   'FTG_HUM_2_LB', 'FTG_HUM_2_UB', 'FTG_HUM_2'], inplace=True)
     # Extract new columns
     age_stat_1 = data.pop('AGE/STAT 1')
     age_stat_2 = data.pop('AGE/STAT 2')
@@ -46,15 +43,52 @@ def process_data(data):
     data.insert(12, 'Position 1', vel_1)
     data.insert(13, 'Position 2', vel_2)
 
-    data = data.rename(columns={
-        'PRSCS_LB': 'PRSCS_LOWER_BOUND',
-        'PRSCS_UB': 'PRSCS_UPPER_BOUND',
-        'FTG_HUM_1': 'FTG_HUM_1',
-        'FTG_HUM_2': 'FTG_HUM_2',
-    })
-    data.drop(columns=['SCS', 'FTG_HUM_1_LB','FTG_HUM_1_UB',
-                      'FTG_HUM_2_LB','FTG_HUM_2_UB',], inplace=True)
+    # Rename columns for better readability and consistency
+#    data = data.rename(columns={
+#        'PRSCS_LB': 'PRSCS_LOWER_BOUND',
+#        'PRSCS_UB': 'PRSCS_UPPER_BOUND',
+#        'FTG_HUM_1': 'FTG_HUM_1',
+#        'FTG_HUM_2': 'FTG_HUM_2',
+#    })
+    
+    # Drop unnecessary columns that are not required for further processing
+#    data.drop(columns=['SCS', 'FTG_HUM_1_LB', 'FTG_HUM_1_UB',
+#                       'FTG_HUM_2_LB', 'FTG_HUM_2_UB'], inplace=True)
+
+    data['PRSCS_LOWER_BOUND'] = 0
+    data['PRSCS_UPPER_BOUND'] = 0
+    data['FTG_HUM_1'] = 0
+    data['FTG_HUM_2'] = 0
+
     return data
+
+def reverse_process_data(data):
+    # Split AGE/STAT columns back into original components
+    data[['HUM_1_AGE', 'HUM_1_STA']] = data['HUM_1_FTG'].str.split('/', expand=True)
+    data[['HUM_2_AGE', 'HUM_2_STA']] = data['HUM_2_FTG'].str.split('/', expand=True)
+
+    # Convert types back if needed
+    data['HUM_1_AGE'] = data['HUM_1_AGE'].astype(int)
+    data['HUM_2_AGE'] = data['HUM_2_AGE'].astype(int)
+    data['HUM_1_STA'] = data['HUM_1_STA'].astype(int)
+    data['HUM_2_STA'] = data['HUM_2_STA'].astype(int)
+
+    # Split Position columns back into original X and Y
+    data[['HUM_1_POS_X', 'HUM_1_POS_Y']] = data['HUM_1_POS'].str.split(', ', expand=True).astype(float)
+    data[['HUM_2_POS_X', 'HUM_2_POS_Y']] = data['HUM_2_POS'].str.split(', ', expand=True).astype(float)
+
+    # Drop combined columns
+    data.drop(columns=['HUM_1_FTG', 'HUM_2_FTG', 'HUM_1_POS', 'HUM_2_POS'], inplace=True)
+
+    # Remove placeholder columns
+    data['SCS'] = data['PRSCS_LOWER_BOUND'] + data['PRSCS_UPPER_BOUND'] / 2
+    data.drop(columns=['PRSCS_LOWER_BOUND', 'PRSCS_UPPER_BOUND', 'FTG_HUM_1', 'FTG_HUM_2'], inplace=True)
+
+    # Optional: revert categorical-to-numeric (only if you have access to inverse mapping from dc)
+    # data = dc.categorical_to_numeric(data)  # if supported
+
+    return data
+
 
 def mc_results_from_configs(data):
     data = process_data(data)

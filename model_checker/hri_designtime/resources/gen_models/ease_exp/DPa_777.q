@@ -1,5 +1,0 @@
-E[<=250](max:humanFatigue[0])
-E[<=250](max:humanFatigue[1])
-E[<=250](max:humanFatigue[2])
-E[<=250](max:humanFatigue[3])
-E[<=250](max:humanFatigue[4])

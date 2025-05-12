@@ -41,10 +41,10 @@ class Query:
 
     def get_query(self):
         if self.t == Query_Type.P_SCS:
-            if self.n != ND:
-                return "Pr[<={};{}](<> scs)\n".format(self.tau, self.n)
-            else:
-                return "Pr[<={}](<> scs)\n".format(self.tau)
+            ##if self.n != ND:
+            #    return "Pr[<={};{}](<> scs)\n".format(self.tau, self.n)
+            #else:
+            return "Pr[<={}](<> scs)\n".format(self.tau)
         elif self.t == Query_Type.P_FAIL:
             if self.n != ND:
                 return "Pr[<={};{}](<> fail)\n".format(self.tau, self.n)
@@ -61,7 +61,7 @@ class Query:
                 q = ''
                 for (i, h) in enumerate(self.hums):
                     if h.path != 2:
-                        q += "E[<={}](max:humanFatigue[{}])\n".format(self.tau, i)
+                        q += "E[<={};1000](max:humanFatigue[{}])\n".format(self.tau, i)
                 return q
         elif self.t == Query_Type.E_CHG:
             if self.n != ND:
