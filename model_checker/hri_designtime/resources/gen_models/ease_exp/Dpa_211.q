@@ -1,4 +1,4 @@
-Pr[<=323;10](<> scs)
+Pr[<=323](<> scs)
 E[<=250;10](max:humanFatigue[0])
 E[<=250;10](max:humanFatigue[1])
 E[<=250;10](max:humanFatigue[2])

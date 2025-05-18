@@ -4,6 +4,7 @@ from self_repair.LIME import explain_prediction_with_lime
 import smogn
 import json
 from utils.datacleaner import get_transformation_rules
+import utils.datacleaner as dc
 from sklearn.neighbors import KernelDensity
 
 with open('data/hmtfactor_config.json', 'r') as file:
@@ -18,7 +19,10 @@ def smote_oversampling(df: pd.DataFrame):
         k=6,
         rel_coef=0.35
     )
-    return pd.DataFrame(df_resampled)
+    
+    new_data = dc.castIntegerFeatures(df_resampled)
+    
+    return new_data
 
 def random_oversampling(df, n_samples = 100):
     synthetic_data = {}
@@ -30,6 +34,8 @@ def random_oversampling(df, n_samples = 100):
         elif factor_key not in transformation_rules.keys():
             if "PRGS" == factor_key:
                 synthetic_data[factor_key] = np.random.choice([0,1,2,3,4,5])
+            elif factor_key == "PSCS__TAU":
+                synthetic_data[factor_key] = np.random.choice(np.arange(250, 751), n_samples)
             else:
                 if factor_key in ["HUM_1_POS_X", "HUM_2_POS_X"]:
                     col_max, col_min = factors["HUM_1_POS"]["max_x"], factors["HUM_1_POS"]["min_x"]
@@ -74,8 +80,12 @@ def lime_based_resampling(df: pd.DataFrame, regressor, n_samples=100):
                     probabilities = np.exp(-0.5 * ((values - mean) / variance) ** 2)
                     probabilities /= probabilities.sum()
                     new_value = np.random.choice(values, p=probabilities)
+                elif feature == "PSCS__TAU":
+                    values = np.arange(250, 751)
+                    probabilities = np.exp(-0.5 * ((values - mean) / variance) ** 2)
+                    probabilities /= probabilities.sum()
+                    new_value = np.random.choice(values)
                 else:
-                    
                     if feature in ["HUM_1_POS_X", "HUM_2_POS_X"]:
                         col_max, col_min = factors["HUM_1_POS"]["max_x"], factors["HUM_1_POS"]["min_x"]
                     elif feature in ["HUM_1_POS_Y", "HUM_2_POS_Y"]:
@@ -109,13 +119,14 @@ def kde_based_resampling(df: pd.DataFrame, n_samples=100):
             samples = kde.sample(n_samples).flatten()
             feature_samples[feature] = samples
         else:
-            # Handle categorical features separately
+            # Takes the values of each feature from the transformation rules
             values = np.array(list(transformation_rules[feature].values()), dtype=float)
+            # all props are equal
             probs = np.ones(len(values)) / len(values)
             samples = np.random.choice(values, size=n_samples, p=probs)
             feature_samples[feature] = samples
+    
+    new_samples = pd.DataFrame(feature_samples)
+    new_samples = dc.castIntegerFeatures(new_samples)
 
-    # Build DataFrame from sampled features
-    new_df = pd.DataFrame(feature_samples)
-
-    return new_df
+    return new_samples

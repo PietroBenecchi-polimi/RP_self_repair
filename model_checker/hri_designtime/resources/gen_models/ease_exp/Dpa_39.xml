@@ -224,13 +224,13 @@ int patterns_alt2[H] = {1,1,1,0};
 //
 
 // -&gt; DEFINE STARTING LOCATIONS IN CARTESIAN PLAN
-double startX[H] = {1003.85,1400.0,400.0,500.0};
-double startY[H] = {774.62,200.0,200.0,200.0};
+double startX[H] = {2561.705641592121,1400.0,400.0,500.0};
+double startY[H] = {239.81121958365787,200.0,200.0,200.0};
 
-double startX_alt1[H] = {1003.85,1400.0,400.0,500.0};
-double startY_alt1[H] = {774.62,200.0,200.0,200.0};
-double startX_alt2[H] = {1003.85,1400.0,400.0,500.0};
-double startY_alt2[H] = {774.62,200.0,200.0,200.0};
+double startX_alt1[H] = {2561.705641592121,1400.0,400.0,500.0};
+double startY_alt1[H] = {239.81121958365787,200.0,200.0,200.0};
+double startX_alt2[H] = {2561.705641592121,1400.0,400.0,500.0};
+double startY_alt2[H] = {239.81121958365787,200.0,200.0,200.0};
 
 // -&gt; DEFINE DESTINATIONS IN CARTESIAN PLAN
 // the definition of destination can vary depending on the pattern,
@@ -5079,8 +5079,8 @@ clock t_act;
 
 //Human-Robot Distance Parameters
 const double safetyDistance = 2.0;
-const double stopDistance = 7.07;
-const double restartDistance = 3.85;
+const double stopDistance = 5.21;
+const double restartDistance = 2.72;
 int recipientStages = 0;
 
 //Recharging Policy Parameters
@@ -5090,8 +5090,8 @@ const double failBattery = 11.0;
 
 //Fatigue-Monitoring Parameters
 const double failFatigue = 0.97;
-const double stopFatigue = 0.61;
-const double resumeFatigue = 0.32;
+const double stopFatigue = 0.52;
+const double resumeFatigue = 0.23;
 
 
 /**
@@ -5708,8 +5708,8 @@ void publish() {
 </template>
 	<system>
 // Robot Instances
-r_1 = Robot(1, 95.0, 95.0, 2500.00, 510.00);
-b_r_1 = Battery(1, 11.44581376);
+r_1 = Robot(1, 44.963305037301275, 44.963305037301275, 2500.00, 510.00);
+b_r_1 = Battery(1, 12.10166328137145);
 r_pub_1 = ROS_SensPub(1, 0.0, 0.00);
 c_pub = ROS_SensPub(0, 0.5, 0.01);
 
@@ -5727,10 +5727,10 @@ opchk_1 = OpChk(1, 1, 0);
 
 // Human Instances
 // -&gt; DEFINE HUMAN PATTERNS
-h_2 = Human_Leader(1, 55.0, 6, -1, -1, -1);
-h_3 = Human_Leader(2, 55.0, 6, -1, -1, -1);
-h_4 = Human_Leader(3, 32.0, 6, -1, -1, -1);
-h_5 = Human_Follower(4, 32.0, 6, -1, 3, -1);
+h_2 = Human_Leader(1, 50.36707924261461, 1, 7, -1, -1);
+h_3 = Human_Leader(2, 50.36707924261461, 1, 7, -1, -1);
+h_4 = Human_Leader(3, 66.76072185643407, 6, 7, -1, -1);
+h_5 = Human_Follower(4, 66.76072185643407, 6, 7, 3, -1);
 h_pub_pos = ROS_SensPub(2, 0.5, 0.01);
 h_pub_ftg = ROS_SensPub(3, 0.5, 0.01);
 

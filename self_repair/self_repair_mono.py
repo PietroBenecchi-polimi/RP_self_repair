@@ -1,111 +1,49 @@
 import pandas as pd
-from self_repair.oversampling import lime_based_resampling, random_oversampling, smote_oversampling, kde_based_resampling
 from self_repair.configuration_validation import validate_configurations, validate_configuration
-import warnings
-from sklearn.exceptions import InconsistentVersionWarning
-from typing import Dict
 import multiprocessing
 import time
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import SGDRegressor
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.base import clone
 import numpy as np
 import utils.datacleaner as ut
-
-warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
-from self_repair.mc_opt_interface import *
+from self_repair.self_repair_toolbox import train_new_regressor, opt_optimization, mc_results_from_configs, oversample_and_validation, oversampling_methods_parallel
+from utils.datacleaner import get_transformation_rules
+import json
+with open('data/hmtfactor_config.json', 'r') as file:
+    factors = dict(json.load(file))
 
-def oversample_method(method_name: str, invalid_configs: pd.DataFrame, regressor=None, previous_configs: pd.DataFrame = None, n_samples: int = 100) -> Dict:
-    try:
-        if method_name == "Random":
-            new_samples = random_oversampling(df=invalid_configs, n_samples=n_samples)
-            new_samples["SCS"] = 0
-        elif method_name == "Smote":
-            new_samples = smote_oversampling(df=invalid_configs)
-        elif method_name == "Smote-2":
-            new_samples = smote_oversampling(df=previous_configs)
-        elif method_name == "LIME_gaussian":
-            new_samples = lime_based_resampling(df=invalid_configs, regressor=regressor, n_samples=n_samples)
-            new_samples["SCS"] = 0
-        elif method_name == "KDE":
-            new_samples = kde_based_resampling(df=invalid_configs, n_samples=n_samples)
-            new_samples["SCS"] = 0
+def synthesize_data(target_config: pd.DataFrame):
+    n_samples = 20
+    synthetic_data = {}
+    transformation_rules = get_transformation_rules()
+
+    for factor_key in target_config.columns:
+        if factor_key == "SCS":
+            synthetic_data[factor_key] = np.random.uniform(0,1, n_samples)
+        elif factor_key not in transformation_rules.keys():
+            if "PRGS" == factor_key:
+                synthetic_data[factor_key] = np.random.choice([0,1,2,3,4,5])
+            else:
+                if factor_key in ["HUM_1_POS_X", "HUM_2_POS_X"]:
+                    col_max, col_min = factors["HUM_1_POS"]["max_x"], factors["HUM_1_POS"]["min_x"]
+                elif factor_key in ["HUM_1_POS_Y", "HUM_2_POS_Y"]:
+                    col_max, col_min = factors["HUM_1_POS"]["max_y"], factors["HUM_1_POS"]["min_y"]
+                elif "max" in factors[factor_key]:
+                    col_max, col_min = factors[factor_key]["max"], factors[factor_key]["min"]
+
+                synthetic_data[factor_key] = np.random.uniform(col_min, col_max, n_samples)
         else:
-            raise ValueError(f"Unknown oversampling method: {method_name}")
-        return {
-            "method": method_name,
-            "samples": new_samples.drop(columns=["SCS"]),
-            "error": False,
-            "SCS": new_samples["SCS"]
-        }
-    except ValueError as e:
-        logger.error(f"Error in oversample_method [{method_name}]: {str(e)}")
-        return {"method": method_name, "error": True, "message": str(e)}
+            values = list(transformation_rules[factor_key].values())
+            synthetic_data[factor_key] = np.random.choice(values, n_samples)
 
-def oversampling_methods_parallel(invalid_configs: pd.DataFrame, previous_configs: pd.DataFrame = None, n_samples=100, regressor=None) -> Dict:
-    # Create list of oversampling methods
-    methods = ["Smote", "Random","LIME_gaussian", "KDE"]
-    
-    # Use multiprocessing to parallelize oversampling methods
-    with multiprocessing.Pool(processes=len(methods)) as pool:
-        results = pool.starmap(
-            oversample_method,
-            [
-                (method, invalid_configs, regressor)
-                for method in methods
-            ]
-        )
-    results = [result for result in results if result["error"] == False]
-    return results
+    return pd.DataFrame(synthetic_data)
 
-# Run oversample method, re-optimizationa and validatio 
-def oversample_and_validation(method: Dict, previous_data: pd.DataFrame, regressor, ground_truth_regressor, test_dataset: pd.DataFrame, skip_cache = True) -> Dict:
-    logger.debug(f"Oversampling via {method['method']}")
-    new_samples = method["samples"]
-    
-    # Smote doesn't need to pass to mc. We already have y values.
-    if method["method"] in ["Smote", "Smote-2"]:
-        new_samples_results = pd.concat(
-        [method["SCS"].to_frame(), new_samples], 
-        axis=1)
-    else:
-        new_samples_results = mc_results_from_configs(new_samples, ground_truth_regressor)
-
-    # Create new dataset to retrain regressor
-    combined_dataset = pd.concat([previous_data, new_samples_results], ignore_index=True)
-    X = combined_dataset.drop(columns=["SCS"])
-    y = combined_dataset["SCS"]
-
-    #Train new regressor
-    regressor_copy = clone(regressor)
-    regressor_copy.fit(X, y)
-
-    new_opt_configs_results = opt_optimization(test_dataset, regressor_copy, f"{method['method']}_{len(test_dataset)}", skip_cache)
-    new_groundtruth = mc_results_from_configs(new_opt_configs_results.drop(columns=["SCS"]), ground_truth_regressor)
-
-    # Testing configuration after Re-optimization
-    _, epsilon_array = validate_configurations(new_opt_configs_results, new_groundtruth)
-
-    logger.debug(f"{method['method']} oversampling concluded: mean epsilon was: {np.mean(epsilon_array)}")
-    return {"method": method["method"], "epsilon": np.mean(epsilon_array)}
-
-def train_new_regressor(training_set: pd.DataFrame):
-    X_train = training_set.drop(columns=["SCS"])
-    y_train = training_set["SCS"]
-
-    regressor = RandomForestRegressor(random_state=42)
-    regressor.fit(X_train, y_train)
-
-    logger.debug("New regressor trained successfully")
-    return regressor
 
 def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_validation: str, points_regressor, skip_cache = True):
     logger.info(f"Configuration: dataset_size:{n_data_to_verify}, oversampling size:{n_samples}, Second validation is with: {data_type_second_validation}")
+    stats = []
     #Training dataset
     data_path = "data/dataset1000.csv"
-    dataset = ut.prepare_dataset(data_path)
+    dataset = ut.load_dataset_for_regressor(data_path)
 
     # Model checker, ground truth regressor
     ground_truth_regressor = train_new_regressor(dataset)
@@ -116,49 +54,35 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
 
     # Transformation rules for dataset
     data_path = "data/initial_configurations_to_improve.csv"
-    verification_dataset = ut.prepare_dataset(data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
+    verification_dataset = ut.load_dataset_for_regressor(data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
 
     # First optimization and retrive data with model checker
     opt_results = opt_optimization(verification_dataset, regressor, f"regressor_{points_regressor}", skip_cache)
     opt_configs = opt_results.drop(columns=["SCS"])
     ground_truth_first_verificatation = mc_results_from_configs(opt_configs, ground_truth_regressor)
     invalid_configs, epsilon_array = validate_configurations(opt_results, ground_truth_first_verificatation)
-    # Test accuracy of optimization
-    stats = []
+    stats.append({"method": "regressor - no oversampling", "epsilon": np.mean(epsilon_array), "epsilon_array": epsilon_array})
+    # Select target configuration
     for i in range(len(opt_results)):
         verification = ground_truth_first_verificatation.iloc[i]
         result = opt_results.iloc[i]
         try:
-            invalid_config, epsilon = validate_configuration(verification, result)
+            target_config, epsilon = validate_configuration(verification, result)
             break
         except ValueError:
             continue
+    target_configs = synthesize_data(target_config=target_config)
 
-    target_config = {"config" : invalid_config, "epsilon": epsilon}
-    logger.debug(f"Epsilon target configuration before oversampling: {epsilon}")
-    stats.append({"method": "target - no oversampling", "epsilon": epsilon})
-    stats.append({"method": "regressor - no oversampling", "epsilon": np.mean(epsilon_array)})
-
+    target_configs_verification = mc_results_from_configs(target_configs, ground_truth_regressor)
+    invalid_configs, epsilon_array = validate_configurations(target_configs, target_configs_verification)
+    logger.debug(f"Epsilon target ball configuration before oversampling: {np.mean(epsilon_array)}")
+    stats.append({"method": "target_ball - no oversampling", "epsilon": {np.mean(epsilon_array)}, "epsilon_array": epsilon_array})
 
     # Second verification:
-    # 3 possible configurations: 
-    # 1. Use the invalid configurations from the first verification
-    # 2. Use the the entire dataset of the first verification
-    # 3. Use a brand new dataset 
     if data_type_second_validation == "invalid_configs":
-        second_test = pd.DataFrame([target_config["config"]])
+        second_test = target_configs
     else:
         second_test = verification_dataset
-
-    # Run oversampling, re-optimization and validation
-    methods_samples = oversampling_methods_parallel(invalid_configs=pd.DataFrame([target_config["config"]]), n_samples=n_samples, regressor=regressor)
-    args = [(method, dataset, regressor, ground_truth_regressor, second_test, skip_cache) for method in methods_samples]
-    #Parallel running
-    logger.debug("Starting the oversampling and validation process")
-    start_time = time.time()
-    # Use multiprocessing to parallelize the oversampling, re-optimization and validation process
-    with multiprocessing.Pool(processes=len(methods_samples)) as pool:
-        results = pool.starmap(oversample_and_validation, args)
 
     # Second verification
     if data_type_second_validation == "invalid_configs":
@@ -167,7 +91,16 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
         ground_truth_second_verificatation = mc_results_from_configs(second_validation_results.drop(columns=["SCS"]), ground_truth_regressor)
         _, epsilon_array = validate_configurations(second_validation_results, ground_truth_second_verificatation)
     
-    stats.append({"method": "regressor - second verification", "epsilon": np.mean(epsilon_array)})
+    stats.append({"method": "target_ball - second verification", "epsilon": np.mean(epsilon_array)})
+    # Run oversampling, re-optimization and validation
+    methods_samples = oversampling_methods_parallel(invalid_configs=invalid_configs, n_samples=n_samples, regressor=regressor, target_config=pd.DataFrame([target_config["config"]]))
+    args = [(method, dataset, regressor, ground_truth_regressor, second_test, skip_cache) for method in methods_samples]
+    #Parallel running
+    logger.debug("Starting the oversampling and validation process")
+    start_time = time.time()
+    # Use multiprocessing to parallelize the oversampling, re-optimization and validation process
+    with multiprocessing.Pool(processes=len(methods_samples)) as pool:
+        results = pool.starmap(oversample_and_validation, args)
 
     end_time = time.time()
     logger.debug("Oversampling and validation process completed")

@@ -1,31 +1,29 @@
 import pandas as pd
 from utils.rp_logger import logger
-from main_mc import process_data
-from utils.datacleaner import fromMCtoOptimizer
 import model_checker.hri_designtime.src.hmt_factors as hmtf
 from configurations_optimizer.NSGA_II_adapter import optimize_configurations
 import os
 
-def mc_results_from_configs(new_configs:pd.DataFrame, cache_file_name:str) -> pd.DataFrame:
-    # Try fetching in the cache
-    try:
-        result = pd.read_csv(f"/self_repair/cache/mc/{cache_file_name}.csv")
-    except FileNotFoundError:
-        logger.warning(f"Cache miss on {cache_file_name}, MC will be used")
-        data_processed = process_data(new_configs)
-        result = hmtf.run_mc_simulations(data_processed)
-        result.to_csv("mc_results.csv", index=False)
-        # result = pd.read_csv("mc_results.csv")
-        result = fromMCtoOptimizer(result)
-    return result
+# def mc_results_from_configs(new_configs:pd.DataFrame, cache_file_name:str) -> pd.DataFrame:
+#     # Try fetching in the cache
+#     try:
+#         result = pd.read_csv(f"/self_repair/cache/mc/{cache_file_name}.csv")
+#     except FileNotFoundError:
+#         logger.warning(f"Cache miss on {cache_file_name}, MC will be used")
+#         data_processed = fromOptimizerToMC(new_configs)
+#         result = hmtf.run_mc_simulations(data_processed)
+#         result.to_csv("mc_results.csv", index=False)
+#         # result = pd.read_csv("mc_results.csv")
+#         result = fromMCtoOptimizer(result)
+#     return result
 
-#def mc_results_from_configs(new_configs:pd.DataFrame, scs_ground_truth_regressor) -> pd.DataFrame:
-#    try:
-#       scs_y = scs_ground_truth_regressor.predict(new_configs)
-#        new_configs["SCS"] = scs_y
-#    except Exception:
-#        new_configs = new_configs
-#    return new_configs
+def mc_results_from_configs(new_configs:pd.DataFrame, scs_ground_truth_regressor) -> pd.DataFrame:
+   try:
+      scs_y = scs_ground_truth_regressor.predict(new_configs)
+      new_configs["SCS"] = scs_y
+   except Exception:
+       new_configs = new_configs
+   return new_configs
 
 def opt_optimization(new_configs: pd.DataFrame, scs_regressor, cache_file_name: str, skip_caching=False) -> pd.DataFrame:
     cache_dir = "self_repair/cache/opt"

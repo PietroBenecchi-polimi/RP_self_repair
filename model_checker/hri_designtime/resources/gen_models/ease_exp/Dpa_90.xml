@@ -195,53 +195,53 @@ double internalRobX[R], internalRobY[R];
 **/
 
 // -&gt; HOW MANY HUMANS TO SERVE IN THE MISSION
-const int H = 5;
+const int H = 4;
 
 
-bool served[H] = {false,false,false,false,false};
-bool objectTaken[H] = {false,false,false,false,false};
-double humanFatigue[H] = {0.0,0.0,0.0,0.0,0.0};
-double humanPositionX[H] = {0.0,0.0,0.0,0.0,0.0};
-double humanPositionY[H] = {0.0,0.0,0.0,0.0,0.0};
-double humTheta[H] = {0.0,0.0,0.0,0.0,0.0};
+bool served[H] = {false,false,false,false};
+bool objectTaken[H] = {false,false,false,false};
+double humanFatigue[H] = {0.0,0.0,0.0,0.0};
+double humanPositionX[H] = {0.0,0.0,0.0,0.0};
+double humanPositionY[H] = {0.0,0.0,0.0,0.0};
+double humTheta[H] = {0.0,0.0,0.0,0.0};
 
-double internalFatigue[H] = {0.0,0.0,0.0,0.0,0.0};
-double internalHumX[H] = {0.0,0.0,0.0,0.0,0.0};
-double internalHumY[H] = {0.0,0.0,0.0,0.0,0.0};
+double internalFatigue[H] = {0.0,0.0,0.0,0.0};
+double internalHumX[H] = {0.0,0.0,0.0,0.0};
+double internalHumY[H] = {0.0,0.0,0.0,0.0};
 
 const int ND = -1;
 const double NDD = -1.0;
 int PATH = 0;
 
-int SAME_H_IDs[H][H] = {{1,4,5,-1,-1},{2,3,-1,-1,-1},{3,2,-1,-1,-1},{4,1,5,-1,-1},{5,1,4,-1,-1}};
+int SAME_H_IDs[H][H] = {{1,-1,-1,-1},{2,-1,-1,-1},{3,4,-1,-1},{4,3,-1,-1}};
 
 // -&gt; DEFINE PATTERN SEQUENCE (make sure it is consistent with humans ids)
 // 0: human follower, 1: human leader, 2: human recipient, 3: human applicant,
 // 10: human_rescuer, (11: human_interdependence_mission,) 12: human competitor
-int patterns[H] = {0,1,1,1,0};
-int patterns_alt1[H] = {0,1,1,1,0};
-int patterns_alt2[H] = {0,1,1,1,0};
+int patterns[H] = {1,1,1,0};
+int patterns_alt1[H] = {1,1,1,0};
+int patterns_alt2[H] = {1,1,1,0};
 //
 
 // -&gt; DEFINE STARTING LOCATIONS IN CARTESIAN PLAN
-double startX[H] = {1913.61,825.52,1400.0,400.0,500.0};
-double startY[H] = {326.97,691.49,200.0,200.0,200.0};
+double startX[H] = {3718.4164837819058,1400.0,400.0,500.0};
+double startY[H] = {556.8161058310232,200.0,200.0,200.0};
 
-double startX_alt1[H] = {1913.61,825.52,1400.0,400.0,500.0};
-double startY_alt1[H] = {326.97,691.49,200.0,200.0,200.0};
-double startX_alt2[H] = {1913.61,825.52,1400.0,400.0,500.0};
-double startY_alt2[H] = {326.97,691.49,200.0,200.0,200.0};
+double startX_alt1[H] = {3718.4164837819058,1400.0,400.0,500.0};
+double startY_alt1[H] = {556.8161058310232,200.0,200.0,200.0};
+double startX_alt2[H] = {3718.4164837819058,1400.0,400.0,500.0};
+double startY_alt2[H] = {556.8161058310232,200.0,200.0,200.0};
 
 // -&gt; DEFINE DESTINATIONS IN CARTESIAN PLAN
 // the definition of destination can vary depending on the pattern,
 // and you can decide what it corresponds to for your specific pattern
-double destX[H] = {400.0,1400.0,3000.0,500.0,3000.0};
-double destY[H] = {200.0,200.0,200.0,200.0,200.0};
+double destX[H] = {1400.0,3000.0,500.0,3000.0};
+double destY[H] = {200.0,200.0,200.0,200.0};
 
-double destX_alt1[H] = {400.0,1400.0,3000.0,500.0,3000.0};
-double destY_alt1[H] = {200.0,200.0,200.0,200.0,200.0};
-double destX_alt2[H] = {400.0,1400.0,3000.0,500.0,3000.0};
-double destY_alt2[H] = {200.0,200.0,200.0,200.0,200.0};
+double destX_alt1[H] = {1400.0,3000.0,500.0,3000.0};
+double destY_alt1[H] = {200.0,200.0,200.0,200.0};
+double destX_alt2[H] = {1400.0,3000.0,500.0,3000.0};
+double destY_alt2[H] = {200.0,200.0,200.0,200.0};
 
 /**
 * PARAMS FOR RESCUER AND APPLICANT (task size and dexterity)
@@ -5079,8 +5079,8 @@ clock t_act;
 
 //Human-Robot Distance Parameters
 const double safetyDistance = 2.0;
-const double stopDistance = 6.67;
-const double restartDistance = 2.59;
+const double stopDistance = 5.74;
+const double restartDistance = 3.42;
 int recipientStages = 0;
 
 //Recharging Policy Parameters
@@ -5090,8 +5090,8 @@ const double failBattery = 11.0;
 
 //Fatigue-Monitoring Parameters
 const double failFatigue = 0.97;
-const double stopFatigue = 0.76;
-const double resumeFatigue = 0.18;
+const double stopFatigue = 0.64;
+const double resumeFatigue = 0.32;
 
 
 /**
@@ -5708,8 +5708,8 @@ void publish() {
 </template>
 	<system>
 // Robot Instances
-r_1 = Robot(1, 69.0, 69.0, 2500.00, 510.00);
-b_r_1 = Battery(1, 11.35857658);
+r_1 = Robot(1, 39.821785253809004, 39.821785253809004, 2500.00, 510.00);
+b_r_1 = Battery(1, 11.1905119892576);
 r_pub_1 = ROS_SensPub(1, 0.0, 0.00);
 c_pub = ROS_SensPub(0, 0.5, 0.01);
 
@@ -5727,18 +5727,16 @@ opchk_1 = OpChk(1, 1, 0);
 
 // Human Instances
 // -&gt; DEFINE HUMAN PATTERNS
-h_1 = Human_Follower(1, 58.0, 6, -1, -1, -1);
-h_2 = Human_Leader(2, 76.0, 6, -1, -1, -1);
-h_3 = Human_Leader(3, 76.0, 6, -1, 2, -1);
-h_4 = Human_Leader(4, 58.0, 6, -1, 1, -1);
-h_5 = Human_Follower(5, 58.0, 6, -1, 1, -1);
+h_2 = Human_Leader(1, 34.770853785237264, 4, 7, -1, -1);
+h_3 = Human_Leader(2, 34.770853785237264, 4, 7, -1, -1);
+h_4 = Human_Leader(3, 72.8852335254089, 6, 8, -1, -1);
+h_5 = Human_Follower(4, 72.8852335254089, 6, 8, 3, -1);
 h_pub_pos = ROS_SensPub(2, 0.5, 0.01);
 h_pub_ftg = ROS_SensPub(3, 0.5, 0.01);
 
 //
 
 system
-h_1,
 h_2,
 h_3,
 h_4,

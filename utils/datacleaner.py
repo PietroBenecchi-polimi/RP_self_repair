@@ -32,7 +32,7 @@ def numeric_to_categorical(df: pd.DataFrame) -> pd.DataFrame:
             df_copy[column] = df_copy[column].map(mapping)
     return df_copy
 
-def prepare_dataset(data_path) -> pd.DataFrame:
+def load_dataset_for_regressor(data_path) -> pd.DataFrame:
     data = pd.read_csv(data_path)
     
     data = data.drop(["PRSCS_LB","PRSCS_UB","FTG_HUM_1_LB","FTG_HUM_1_UB",
@@ -40,6 +40,49 @@ def prepare_dataset(data_path) -> pd.DataFrame:
     
     data = categorical_to_numeric(data)
     
+    return data
+
+def fromOptimizerToMC(data):
+    # Convert categorical columns to numeric
+    data = numeric_to_categorical(data)
+    # Combine AGE and STAT into a new column
+    data['AGE/STAT 1'] = data['HUM_1_AGE'].astype(str) + '/' + data['HUM_1_STA'].astype(str)
+    data['AGE/STAT 2'] = data['HUM_2_AGE'].astype(str) + '/' + data['HUM_2_STA'].astype(str)
+
+    data['Position 1'] = data['HUM_1_POS_X'].astype(str) + ', ' + data['HUM_1_POS_Y'].astype(str)
+    data['Position 2'] = data['HUM_2_POS_X'].astype(str) + ', ' + data['HUM_2_POS_Y'].astype(str) 
+
+    data.drop(columns=['HUM_1_POS_X', 'HUM_1_POS_Y', 'HUM_2_POS_X', 'HUM_2_POS_Y', 'HUM_1_AGE', 'HUM_2_AGE',
+                      'HUM_1_STA', 'HUM_2_STA'], inplace=True) 
+    # Extract new columns
+    age_stat_1 = data.pop('AGE/STAT 1')
+    age_stat_2 = data.pop('AGE/STAT 2')
+    vel_1 = data.pop('Position 1')
+    vel_2 = data.pop('Position 2')
+
+    # Desidered position
+    data.insert(9, 'AGE/STAT 1', age_stat_1)
+    data.insert(11, 'AGE/STAT 2', age_stat_2)
+    data.insert(12, 'Position 1', vel_1)
+    data.insert(13, 'Position 2', vel_2)
+
+    # Rename columns for better readability and consistency
+#    data = data.rename(columns={
+#        'PRSCS_LB': 'PRSCS_LOWER_BOUND',
+#        'PRSCS_UB': 'PRSCS_UPPER_BOUND',
+#        'FTG_HUM_1': 'FTG_HUM_1',
+#        'FTG_HUM_2': 'FTG_HUM_2',
+#    })
+    
+    # Drop unnecessary columns that are not required for further processing
+#    data.drop(columns=['SCS', 'FTG_HUM_1_LB', 'FTG_HUM_1_UB',
+#                       'FTG_HUM_2_LB', 'FTG_HUM_2_UB'], inplace=True)
+
+    data['PRSCS_LOWER_BOUND'] = 0
+    data['PRSCS_UPPER_BOUND'] = 0
+    data['FTG_HUM_1'] = 0
+    data['FTG_HUM_2'] = 0
+
     return data
 
 def fromMCtoOptimizer(data) -> pd.DataFrame:
@@ -71,8 +114,8 @@ def fromMCtoOptimizer(data) -> pd.DataFrame:
     
     return data
 
-    
-if __name__ == "__main__":
-    results = pd.read_csv("mc_results.csv")
-    results = fromMCtoOptimizer(results)
-    results.to_csv("mc_results_transformed.csv", index=False)
+def castIntegerFeatures(data):
+    for feature in data.columns:
+        if feature in ["PSCS__TAU", "PRGS"]:
+            data[feature] = data[feature].astype(int)
+    return data
