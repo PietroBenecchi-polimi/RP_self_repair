@@ -3,7 +3,7 @@ import pandas as pd
 import self_repair.oversampling as sample
 import utils.datacleaner as dc
 import joblib
-
+import self_repair.self_repair_toolbox as sf
 
 def check_oversampling_methods():
     data_path = "data/dataset1000.csv"
@@ -32,7 +32,16 @@ def check_oversampling_methods():
     dataset = dc.fromOptimizerToMC(dataset)
     #dataset = hmtf.run_mc_simulations(dataset)
 
+def create_new_file():
+    dataset = dc.load_dataset_for_regressor("data/dataset1000.csv")
+
+    regressor = sf.train_new_regressor(dataset)
+    dataset = dc.fromOptimizerToMC(dataset)
+
+    dataset = dc.fromMCtoOptimizer(dataset)
+    dataset.to_csv("data/after_mc.csv", index=False)
+    regressor.predict(dataset.drop(columns=["SCS"]))
 
 if __name__ == "__main__":
-    check_oversampling_methods()
+    create_new_file()
 

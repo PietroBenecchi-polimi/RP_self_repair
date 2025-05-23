@@ -54,6 +54,7 @@ def fromOptimizerToMC(data):
 
     data.drop(columns=['HUM_1_POS_X', 'HUM_1_POS_Y', 'HUM_2_POS_X', 'HUM_2_POS_Y', 'HUM_1_AGE', 'HUM_2_AGE',
                       'HUM_1_STA', 'HUM_2_STA'], inplace=True) 
+                      
     # Extract new columns
     age_stat_1 = data.pop('AGE/STAT 1')
     age_stat_2 = data.pop('AGE/STAT 2')
@@ -65,19 +66,7 @@ def fromOptimizerToMC(data):
     data.insert(11, 'AGE/STAT 2', age_stat_2)
     data.insert(12, 'Position 1', vel_1)
     data.insert(13, 'Position 2', vel_2)
-
-    # Rename columns for better readability and consistency
-#    data = data.rename(columns={
-#        'PRSCS_LB': 'PRSCS_LOWER_BOUND',
-#        'PRSCS_UB': 'PRSCS_UPPER_BOUND',
-#        'FTG_HUM_1': 'FTG_HUM_1',
-#        'FTG_HUM_2': 'FTG_HUM_2',
-#    })
     
-    # Drop unnecessary columns that are not required for further processing
-#    data.drop(columns=['SCS', 'FTG_HUM_1_LB', 'FTG_HUM_1_UB',
-#                       'FTG_HUM_2_LB', 'FTG_HUM_2_UB'], inplace=True)
-
     data['PRSCS_LOWER_BOUND'] = 0
     data['PRSCS_UPPER_BOUND'] = 0
     data['FTG_HUM_1'] = 0
@@ -89,27 +78,43 @@ def fromMCtoOptimizer(data) -> pd.DataFrame:
     data['SCS'] = data['PRSCS_LOWER_BOUND'] + data['PRSCS_UPPER_BOUND'] / 2
 
     # Split AGE/STAT columns back into original components
-    data['HUM_1_FTG'] = data['HUM_1_FTG'].astype(str)
-    data['HUM_2_FTG'] = data['HUM_2_FTG'].astype(str)
+    data['HUM_1_FTG'] = data['FTG_HUM_1'].astype(str)
+    data['HUM_2_FTG'] = data['FTG_HUM_2'].astype(str)
 
-    data[['HUM_1_AGE', 'HUM_1_STA']] = data['HUM_1_FTG'].str.split('/', expand=True)
-    data[['HUM_2_AGE', 'HUM_2_STA']] = data['HUM_2_FTG'].str.split('/', expand=True)
+    data[['HUM_1_AGE', 'HUM_1_STA']] = data['AGE/STAT 1'].str.split('/', expand=True)
+    data[['HUM_2_AGE', 'HUM_2_STA']] = data['AGE/STAT 2'].str.split('/', expand=True)
     
     data = data.rename(columns={'PROGRESS': 'PRGS'})
 
     # Split Position columns back into original X and Y
-    data['HUM_1_POS'] = data['HUM_1_POS'].astype(str)
-    data['HUM_2_POS'] = data['HUM_2_POS'].astype(str)
+    data['Position 1'] = data['Position 1'].astype(str)
+    data['Position 2'] = data['Position 2'].astype(str)
 
-    data[['HUM_1_POS_X', 'HUM_1_POS_Y']] = data['HUM_1_POS'].str.split(', ', expand=True).astype(float)
-    data[['HUM_2_POS_X', 'HUM_2_POS_Y']] = data['HUM_2_POS'].str.split(', ', expand=True).astype(float)
+    data[['HUM_1_POS_X', 'HUM_1_POS_Y']] = data['Position 1'].str.split(', ', expand=True).astype(float)
+    data[['HUM_2_POS_X', 'HUM_2_POS_Y']] = data['Position 2'].str.split(', ', expand=True).astype(float)
 
-    # Drop combined columns
-    data.drop(columns=['HUM_1_FTG', 'HUM_2_FTG', 'HUM_1_POS', 'HUM_2_POS'], inplace=True)
+    # drop combined columns
+    data.drop(columns=['HUM_1_FTG', 'HUM_2_FTG', 'Position 1', 'Position 2', 'AGE/STAT 1', 'AGE/STAT 2'], inplace=True)
 
-    # Remove placeholder columns
+    # Remove columns scs and ftg(shoul be changed if test on fatigue)
     data.drop(columns=['PRSCS_LOWER_BOUND', 'PRSCS_UPPER_BOUND', 'FTG_HUM_1', 'FTG_HUM_2'], inplace=True)
+    
+    # Extract new columns
+    age_1 = data.pop('HUM_1_AGE')
+    age_2 = data.pop('HUM_2_AGE')
+    stat_1 = data.pop('HUM_1_STA')
+    stat_2 = data.pop('HUM_2_STA')
+    vel_1 = data.pop('ROB_1_VEL')
+    chg_1 = data.pop('ROB_1_CHG')
 
+    # Desidered position
+    data.insert(9, 'HUM_1_AGE', age_1)
+    data.insert(11, 'HUM_2_AGE', age_2)
+    data.insert(10, 'HUM_1_STA', stat_1)
+    data.insert(13, 'HUM_2_STA', stat_2)
+    data.insert(19, 'ROB_1_VEL', vel_1)
+    data.insert(20, 'ROB_1_CHG', chg_1)
+    
     data = categorical_to_numeric(data) 
     
     return data

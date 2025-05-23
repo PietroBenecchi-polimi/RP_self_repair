@@ -3,6 +3,7 @@ from utils.rp_logger import logger
 import model_checker.hri_designtime.src.hmt_factors as hmtf
 from configurations_optimizer.NSGA_II_adapter import optimize_configurations
 import os
+import utils.datacleaner as dc
 
 # def mc_results_from_configs(new_configs:pd.DataFrame, cache_file_name:str) -> pd.DataFrame:
 #     # Try fetching in the cache
@@ -10,11 +11,11 @@ import os
 #         result = pd.read_csv(f"/self_repair/cache/mc/{cache_file_name}.csv")
 #     except FileNotFoundError:
 #         logger.warning(f"Cache miss on {cache_file_name}, MC will be used")
-#         data_processed = fromOptimizerToMC(new_configs)
+#         data_processed = dc.fromOptimizerToMC(new_configs)
 #         result = hmtf.run_mc_simulations(data_processed)
 #         result.to_csv("mc_results.csv", index=False)
 #         # result = pd.read_csv("mc_results.csv")
-#         result = fromMCtoOptimizer(result)
+#         result = dc.fromMCtoOptimizer(result)
 #     return result
 
 def mc_results_from_configs(new_configs:pd.DataFrame, scs_ground_truth_regressor) -> pd.DataFrame:
