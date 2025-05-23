@@ -258,9 +258,32 @@ def plot_epsilon_vs_samples_per_method(df_invalid: pd.DataFrame, df_standard: pd
     plt.savefig(f"tester_results/figs/figs_{test_name}/epsilon_vs_samples_per_method.png", dpi=300)
     plt.show()
 
-def main():
+def classical_oversampling_pipeline():
     regressor_points = [100, 150, 500]
     resampling_points = [10]
+    if len(sys.argv) < 2:
+       logger.error("Please, insert the correct number of arguments")
+       return
+    
+    test_name = sys.argv[1]
+    if(len(test_name.split(" ")) > 1):
+       logger.error("Invalid test name, please use the suggested format")
+       return
+    # Perform oversmapling pipeline:
+    # 1. First validation
+    # 2. Oversmapling
+    # 3. Second validation: It can be invalid configs or standard(first validation)
+    standard_stats = run_experiments(regressor_points, resampling_points, "first_verification", test_name=test_name)
+    invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs", test_name=test_name)
+    df_standard = process_results(standard_stats, "Standard")
+    df_invalid = process_results(invalid_stats, "Invalid Configs")
+
+    plot_epsilon_vs_regressors_per_sample(df_invalid, df_standard, test_name=test_name)
+    plot_epsilon_vs_samples_per_method(df_invalid, df_standard, test_name=test_name)
+
+def oversampling_unsuccessful_mission_pipeline():
+    regressor_points = [100, 200 ,300, 500]
+    resampling_points = [10, 50, 100, 300]
     if len(sys.argv) < 2:
        logger.error("Please, insert the correct number of arguments")
        return
@@ -285,4 +308,9 @@ def main():
 if __name__ == "__main__":
     from multiprocessing import freeze_support
     freeze_support()
-    main()
+    # Normal oversampling pipeline
+    # classical_oversampling_pipeline()
+    # Test 1: CHANGE OF AREA DISTRIBUION
+    #TODO LUIGI
+    # Test 2: oversampling for unsuccessful missions and combination of those
+    oversampling_unsuccessful_mission_pipeline()
