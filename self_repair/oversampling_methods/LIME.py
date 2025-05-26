@@ -11,6 +11,7 @@ from sklearn.exceptions import InconsistentVersionWarning
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 from utils.rp_logger import logger
 from alive_progress import alive_bar
+
 def save_lime_explanation_plot(explanation, instance_index, output_dir):
     """
     Saves the LIME explanation plot for a given instance.

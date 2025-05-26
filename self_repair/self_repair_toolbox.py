@@ -1,5 +1,5 @@
 import pandas as pd
-from self_repair.oversampling import lime_based_resampling, random_oversampling, smote_oversampling, kde_based_resampling
+from self_repair.oversampling_methods.oversampling import lime_based_resampling, random_oversampling, smote_oversampling, kde_based_resampling
 from self_repair.configuration_validation import validate_configurations
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.base import clone

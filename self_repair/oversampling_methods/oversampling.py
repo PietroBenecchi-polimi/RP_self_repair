@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from self_repair.LIME import explain_prediction_with_lime 
+from self_repair.oversampling_methods.LIME import explain_prediction_with_lime 
 import smogn
 import json
 from utils.datacleaner import get_transformation_rules
