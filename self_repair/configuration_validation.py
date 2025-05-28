@@ -29,13 +29,3 @@ def validate_configurations(opt_results, ground_truth):
     invalid_results_df = pd.DataFrame(invalid_results)
 
     return invalid_results_df, epsilon_array
-
-def validate_configuration(opt_result, ground_truth):
-    opt_SCS = opt_result['SCS']
-    mc_SCS = ground_truth['SCS']
-    # Validate SCS
-    validity, epsilon = validate_scs(opt_SCS, mc_SCS)
-
-    if validity:
-        raise ValueError
-    return opt_result, epsilon
