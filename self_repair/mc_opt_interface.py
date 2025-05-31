@@ -3,7 +3,6 @@ from utils.rp_logger import logger
 import model_checker.hri_designtime.src.hmt_factors as hmtf
 from configurations_optimizer.NSGA_II_adapter import optimize_configurations
 import os
-import utils.datacleaner as dc
 
 # def mc_results_from_configs(new_configs:pd.DataFrame, cache_file_name:str) -> pd.DataFrame:
 #     # Try fetching in the cache
@@ -19,12 +18,10 @@ import utils.datacleaner as dc
 #     return result
 
 def mc_results_from_configs(new_configs:pd.DataFrame, scs_ground_truth_regressor) -> pd.DataFrame:
-   try:
-      scs_y = scs_ground_truth_regressor.predict(new_configs)
-      new_configs["SCS"] = scs_y
-   except Exception:
-       new_configs = new_configs
-   return new_configs
+    scs_y = scs_ground_truth_regressor.predict(new_configs)
+    new_configs["SCS"] = scs_y
+
+    return new_configs
 
 def opt_optimization(new_configs: pd.DataFrame, scs_regressor, cache_file_name: str, skip_caching=False) -> pd.DataFrame:
     cache_dir = "self_repair/cache/opt"

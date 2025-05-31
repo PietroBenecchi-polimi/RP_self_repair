@@ -3,14 +3,11 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
-from self_repair.oversamplingMethods import *
+from self_repair.oversampling_methods.oversamplingMethods import *
 from sklearn.base import clone
 
 class Pipeline:
-    ground_truth_regressor = None
-    regressor = None
-    verification_set = []
-    resampling_sets = []
+    
     @classmethod
     def __train_new_regressor(cls, training_set: pd.DataFrame):
         X_train = training_set.drop(columns=["SCS"])
@@ -26,38 +23,36 @@ class Pipeline:
         epsilon = np.abs(opt_SCS - mc_SCS)
         return epsilon < 0.1, epsilon
 
-    def __init__(self, training_dataset_path: str, verification_data_path: str, points_regressor: int, n_data_to_verify: int):
+    def __init__(self, training_dataset_path: str, test_data_path: str, points_regressor: int, n_data_to_verify: int):
         dataset = ut.load_dataset_for_regressor(training_dataset_path)
-        Pipeline.ground_truth_regressor = self.__train_new_regressor(dataset)
-        self.initial_dataset = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
-        Pipeline.regressor = self.__train_new_regressor(self.initial_dataset)
-        Pipeline.verification_dataset = ut.load_dataset_for_regressor(verification_data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
+        self.ground_truth_regressor = self.__train_new_regressor(dataset)
+        self.train__data = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
+        self.regressor = self.__train_new_regressor(self.initial_dataset)
+        # It is a small set based on test_data_path. The size is determined by n_data_to_verify.
+        self.test_set = ut.load_dataset_for_regressor(test_data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
 
     def validate_configurations(self, opt_results, ground_truth):
-        validity_array = []
         epsilon_array = []
         invalid_results = []
 
         # **Iterate through results and validate configurations**
         for i in range(len(opt_results)):
             opt_SCS = opt_results.iloc[i]['SCS']
-            try:
-                mc_SCS = ground_truth.iloc[i]['SCS']
-            except IndexError:
-                continue
-            # Validate SCS
-            validity, epsilon = self.__validation_metric(opt_SCS, mc_SCS)
+            mc_SCS = ground_truth.iloc[i]['SCS']
 
-            if not validity:
+            # Validate SCS
+            valid, epsilon = self.__validation_metric(opt_SCS, mc_SCS)
+
+            if not valid:
                 invalid_results.append(opt_results.iloc[i])
 
-            validity_array.append(validity)
             epsilon_array.append(epsilon)
 
         invalid_results_df = pd.DataFrame(invalid_results)
 
         return invalid_results_df, epsilon_array
 
+    ## Please provide comments
     def oversample(self, n_samples: int, invalid_configurations: pd.DataFrame):
         methods = [
             RandomOversampling,
