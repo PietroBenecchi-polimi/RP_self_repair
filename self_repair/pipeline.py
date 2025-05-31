@@ -30,7 +30,7 @@ class Pipeline:
         self.regressor = self.__train_new_regressor(self.train__data)
         # It is a small set based on test_data_path. The size is determined by n_data_to_verify.
         self.initial_test_set = ut.load_dataset_for_regressor(test_data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
-
+        
     def validate_configurations(self, opt_results, ground_truth):
         epsilon_array = []
         invalid_results = []
@@ -85,7 +85,6 @@ class Pipeline:
                 results_dict[name] = resampled_df
 
         return results_dict
-
     
     def retrain_regressor(self, oversampling: pd.DataFrame):
         combined_dataset = pd.concat([oversampling, self.initial_test_set], ignore_index=True)

@@ -7,6 +7,8 @@ import sys
 from typing import List, Dict
 from utils.rp_logger import logger
 from visualization.visualize_methods import *
+import logging
+logging.getLogger('matplotlib').disabled = True
 
 def save_results(stats_per_points: List[Dict], save_path: str) -> None:
     """Save results to a Pickle file."""
@@ -40,7 +42,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], i
                 n_samples=s_points,
                 data_type_second_validation=invalid_configs_validation,
                 points_regressor=r_points,
-                skip_cache=False
+                skip_cache=True
             )
 
             stats_per_points.append({
