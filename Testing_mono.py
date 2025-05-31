@@ -12,7 +12,6 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], i
 
     for r_points in regressor_points:
         for s_points in resampling_points:
-           
             logger.info(f"\nRunning experiment with regressor_points={r_points}, resampling_points={s_points}")
             stats = run_oversampling_pipeline(
                 n_data_to_verify=50,

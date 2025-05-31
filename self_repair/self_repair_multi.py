@@ -17,7 +17,9 @@ from self_repair.stats import Stat
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 
 def oversampling_validation(pipeline: Pipeline, test_dataset, oversampling_method: str, new_samples: pd.DataFrame, skip_cache = False):
-    new_regressor = pipeline.retrain_regressor(new_samples)
+    new_samples = new_samples.drop(columns=["SCS"]) if "SCS" in new_samples.columns else new_samples
+    new_samples_results = mc_results_from_configs(new_samples, pipeline.ground_truth_regressor)
+    new_regressor = pipeline.retrain_regressor(new_samples_results)
     new_opt_configs_results = opt_optimization(test_dataset, new_regressor, f"{oversampling_method}_{len(test_dataset)}", skip_cache)
     new_groundtruth = mc_results_from_configs(new_opt_configs_results.drop(columns=["SCS"]), pipeline.ground_truth_regressor)
     invalid_configs, epsilon_array = pipeline.validate_configurations(new_opt_configs_results, new_groundtruth)

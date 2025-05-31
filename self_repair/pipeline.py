@@ -27,9 +27,9 @@ class Pipeline:
         dataset = ut.load_dataset_for_regressor(training_dataset_path)
         self.ground_truth_regressor = self.__train_new_regressor(dataset)
         self.train__data = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
-        self.regressor = self.__train_new_regressor(self.initial_dataset)
+        self.regressor = self.__train_new_regressor(self.train__data)
         # It is a small set based on test_data_path. The size is determined by n_data_to_verify.
-        self.test_set = ut.load_dataset_for_regressor(test_data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
+        self.initial_test_set = ut.load_dataset_for_regressor(test_data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
 
     def validate_configurations(self, opt_results, ground_truth):
         epsilon_array = []
@@ -58,7 +58,7 @@ class Pipeline:
             RandomOversampling,
             LimeBasedOversampling,
             KDEOversampling,
-            SmoteOversampling,
+            #SmoteOversampling,
             ADASYNOversampling,
             BorderlineSMOTEOversampling,
             ClusterSMOTEOversampling
@@ -69,13 +69,13 @@ class Pipeline:
         def run_method(cls: OversamplingMethod):
             if cls == LimeBasedOversampling:
                 instance: OversamplingMethod = cls(self.regressor)
-                instance.run_oversampling(df=self.initial_dataset.copy(), n_samples=n_samples)
+                instance.run_oversampling(df=self.initial_test_set.copy(), n_samples=n_samples)
             elif issubclass(cls, SmoteBasedOversampling):
                 instance: SmoteBasedOversampling = cls(invalid_configurations)
-                instance.run_oversampling(n_samples=n_samples)
+                instance.run_oversampling(df=self.initial_test_set, n_samples=n_samples)
             else:
                 instance: OversamplingMethod = cls()
-                instance.run_oversampling(df=self.initial_dataset.copy(), n_samples=n_samples)
+                instance.run_oversampling(df=self.initial_test_set.copy(), n_samples=n_samples)
             return instance.name_id, instance.getResampling()
 
         with ThreadPoolExecutor() as executor:
@@ -88,7 +88,7 @@ class Pipeline:
 
     
     def retrain_regressor(self, oversampling: pd.DataFrame):
-        combined_dataset = pd.concat([oversampling, self.initial_dataset], ignore_index=True)
+        combined_dataset = pd.concat([oversampling, self.initial_test_set], ignore_index=True)
         X = combined_dataset.drop(columns=["SCS"])
         y = combined_dataset["SCS"]
 

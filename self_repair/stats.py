@@ -1,5 +1,6 @@
 from typing import List
 import statistics
+import pickle
 
 class Stat:
     def __init__(self, method_name: str, epsilon_points: List[float], threshold: float = 0.5):
@@ -38,3 +39,12 @@ class Stat:
 
     def get_n_mission_failed(self) -> int:
         return self.n_mission_failed
+
+    def to_pickle(self, filepath: str):
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def from_pickle(cls, filepath: str):
+        with open(filepath, 'rb') as f:
+            return pickle.load(f)

@@ -138,17 +138,18 @@ class KDEOversampling(OversamplingMethod):
         self.setResampling(dc.castIntegerFeatures(new_samples))
 
 class SmoteBasedOversampling(OversamplingMethod):
-    def __init__(self, invalid_configs: pd.DataFrame = pd.DataFrame()):
+    def __init__(self, unbalanced_dataset: pd.DataFrame = pd.DataFrame()):
         super().__init__()
-        self.invalid_configs = invalid_configs
+        self.unbalanced_dataset = unbalanced_dataset
 
 class SmoteOversampling(SmoteBasedOversampling):
-    def __init__(self, invalid_configs: pd.DataFrame):
-        super().__init__(invalid_configs)
+    def __init__(self, unbalanced_dataset: pd.DataFrame):
+        super().__init__(unbalanced_dataset)
         self.name_id = "Smote"
 
     def run_oversampling(self, n_samples: int) -> pd.DataFrame:
-        df = self.invalid_configs.sample(n_samples) if len(self.invalid_configs) > n_samples else self.invalid_configs
+        df = self.unbalanced_dataset.sample(n_samples) if len(self.unbalanced_dataset) > n_samples else self.unbalanced_dataset
+        df.reset_index(drop=True)
         df_resampled = smogn.smoter(
             data=df,
             y='SCS',
@@ -159,12 +160,13 @@ class SmoteOversampling(SmoteBasedOversampling):
         self.setResampling(dc.castIntegerFeatures(df_resampled))
 
 class ADASYNOversampling(SmoteBasedOversampling):
-    def __init__(self, invalid_configs: pd.DataFrame = pd.DataFrame()):
-        super().__init__(invalid_configs)
+    def __init__(self, unbalanced_dataset: pd.DataFrame = pd.DataFrame()):
+        super().__init__(unbalanced_dataset)
         self.name_id = "ADASYN"
 
     def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
         df = df.sample(n_samples) if len(df) > n_samples else df
+        df.reset_index(drop=True)
         X = df.drop(columns=["SCS"])
         y = df["SCS"]
         y_class = (y > 0.5).astype(int)
@@ -177,12 +179,13 @@ class ADASYNOversampling(SmoteBasedOversampling):
         self.setResampling(df_resampled)
 
 class BorderlineSMOTEOversampling(SmoteBasedOversampling):
-    def __init__(self, invalid_configs: pd.DataFrame = pd.DataFrame()):
-        super().__init__(invalid_configs)
+    def __init__(self, unbalanced_dataset: pd.DataFrame = pd.DataFrame()):
+        super().__init__(unbalanced_dataset)
         self.name_id = "BorderlineSMOTE"
 
     def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
         df = df.sample(n_samples) if len(df) > n_samples else df
+        df.reset_index(drop=True)
         X = df.drop(columns=["SCS"])
         y = df["SCS"]
         y_class = (y > 0.5).astype(int)
@@ -195,12 +198,13 @@ class BorderlineSMOTEOversampling(SmoteBasedOversampling):
         self.setResampling(df_resampled)
 
 class ClusterSMOTEOversampling(SmoteBasedOversampling):
-    def __init__(self, invalid_configs: pd.DataFrame = pd.DataFrame()):
-        super().__init__(invalid_configs)
+    def __init__(self, unbalanced_dataset: pd.DataFrame = pd.DataFrame()):
+        super().__init__(unbalanced_dataset)
         self.name_id = "ClusterSMOTE"
 
     def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
         df = df.sample(n_samples) if len(df) > n_samples else df
+        df.reset_index(drop=True)
         X = df.drop(columns=["SCS"])
         y = df["SCS"]
         y_class = (y > 0.5).astype(int)

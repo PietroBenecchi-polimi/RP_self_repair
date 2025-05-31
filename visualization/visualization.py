@@ -1,6 +1,4 @@
 import os
-import sys
-import logging
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,7 +6,6 @@ import seaborn as sns
 from typing import List, Dict
 from matplotlib import cm
 from utils.rp_logger import logger
-
 
 def process_oversampling_results(stats_per_points: List[Dict], validation_type: str) -> pd.DataFrame:
     """Process oversampling experiment results into a DataFrame for visualization."""
@@ -20,7 +17,7 @@ def process_oversampling_results(stats_per_points: List[Dict], validation_type: 
 
         for stat in experiment['stats']:
             method = stat['method']
-            epsilon = stat['epsilon']  
+            epsilon = stat['epsilon']
             data.append({
                 'Method': method,
                 'Regressor Points': r_points,
