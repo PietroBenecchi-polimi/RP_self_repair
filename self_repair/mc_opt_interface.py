@@ -22,6 +22,7 @@ class ModelCheckerInterface(MC_OPT_INTERFACE):
 
     def mc_results_from_configs(self, new_configs: pd.DataFrame, cache_file_name: str) -> pd.DataFrame:
         cache_path = os.path.join("self_repair/cache/mc", f"{cache_file_name}.csv")
+        
         if not self.skip_cache:
             try:
                 result = pd.read_csv(f"/self_repair/cache/mc/{cache_file_name}.csv")
@@ -68,9 +69,10 @@ class RegressorInterface(MC_OPT_INTERFACE):
         self.scs_ground_truth_regressor = scs_ground_truth_regressor
         self.skip_cache = skip_cache
     
-    def mc_results_from_configs(self, new_configs: pd.DataFrame, cache_file_name:str) -> pd.DataFrame:
+    def mc_results_from_configs(self, new_configs: pd.DataFrame) -> pd.DataFrame:
         scs_y = self.scs_ground_truth_regressor.predict(new_configs)
         new_configs["SCS"] = scs_y
+        
         return new_configs
 
     def opt_optimization(self, new_configs: pd.DataFrame, scs_regressor, cache_file_name: str) -> pd.DataFrame:

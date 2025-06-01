@@ -26,10 +26,10 @@ class Pipeline:
     def __init__(self, training_dataset_path: str, test_data_path: str, points_regressor: int, n_data_to_verify: int):
         dataset = ut.load_dataset_for_regressor(training_dataset_path)
         self.ground_truth_regressor = self.__train_new_regressor(dataset)
-        self.train__data = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
+        self.train_data = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
         self.regressor = self.__train_new_regressor(self.train__data)
         # It is a small set based on test_data_path. The size is determined by n_data_to_verify.
-        self.initial_test_set = ut.load_dataset_for_regressor(test_data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
+        self.test_set = ut.load_dataset_for_regressor(test_data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
         
     def validate_configurations(self, opt_results, ground_truth):
         epsilon_array = []
@@ -52,7 +52,9 @@ class Pipeline:
 
         return invalid_results_df, epsilon_array
 
-    ## Please provide comments
+    ## Run all oversampling methods in parallel. Is it parallel? 
+    ## Output: dictionary <method_name, new_data>
+    ## IMPORTANT: data is generated without metrics(SCS, FTG)
     def oversample(self, n_samples: int, invalid_configurations: pd.DataFrame):
         methods = [
             RandomOversampling,
@@ -69,13 +71,13 @@ class Pipeline:
         def run_method(cls: OversamplingMethod):
             if cls == LimeBasedOversampling:
                 instance: OversamplingMethod = cls(self.regressor)
-                instance.run_oversampling(df=self.initial_test_set.copy(), n_samples=n_samples)
+                instance.run_oversampling(df=self.test_set.copy(), n_samples=n_samples)
             elif issubclass(cls, SmoteBasedOversampling):
                 instance: SmoteBasedOversampling = cls(invalid_configurations)
-                instance.run_oversampling(df=self.initial_test_set, n_samples=n_samples)
+                instance.run_oversampling(df=self.test_set, n_samples=n_samples)
             else:
                 instance: OversamplingMethod = cls()
-                instance.run_oversampling(df=self.initial_test_set.copy(), n_samples=n_samples)
+                instance.run_oversampling(df=self.test_set.copy(), n_samples=n_samples)
             return instance.name_id, instance.getResampling()
 
         with ThreadPoolExecutor() as executor:
@@ -87,11 +89,12 @@ class Pipeline:
         return results_dict
     
     def retrain_regressor(self, oversampling: pd.DataFrame):
-        combined_dataset = pd.concat([oversampling, self.initial_test_set], ignore_index=True)
-        X = combined_dataset.drop(columns=["SCS"])
-        y = combined_dataset["SCS"]
+        self.train_data = pd.concat([oversampling, self.train_data], ignore_index=True)
+        X = self.train_data.drop(columns=["SCS"])
+        y = self.train_data["SCS"]
 
         regressor_copy = clone(self.regressor)
         regressor_copy.fit(X, y)
-
-        return regressor_copy
+        self.regressor = regressor_copy
+        
+        return self.regressor

@@ -9,7 +9,7 @@ import utils.datacleaner as ut
 from utils.rp_logger import logger
 from self_repair.pipeline import Pipeline
 from self_repair.stats import Stat
-from self_repair.mc_opt_interface import (MC_OPT_INTERFACE, RegressorInterface, ModelCheckerInterface)
+from self_repair.mc_opt_interface import MC_OPT_INTERFACE, RegressorInterface 
 warnings.simplefilter("ignore", InconsistentVersionWarning)
 
 def oversampling_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeline, test_dataset, oversampling_method: str, new_samples: pd.DataFrame):
@@ -18,7 +18,7 @@ def oversampling_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeline, tes
     new_regressor = pipeline.retrain_regressor(new_samples_results)
     new_opt_configs_results = interface.opt_optimization(test_dataset, new_regressor, f"{oversampling_method}_{len(test_dataset)}")
     new_groundtruth = interface.mc_results_from_configs(new_opt_configs_results.drop(columns=["SCS"]), pipeline.ground_truth_regressor)
-    invalid_configs, epsilon_array = pipeline.validate_configurations(new_opt_configs_results, new_groundtruth)
+    _, epsilon_array = pipeline.validate_configurations(new_opt_configs_results, new_groundtruth)
     return Stat(oversampling_method, epsilon_array)
 
 def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_validation, points_regressor, skip_cache) -> list:
@@ -32,7 +32,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     verification_data_path = "data/initial_configurations_to_improve.csv"
     pipeline = Pipeline(training_data_path, verification_data_path, points_regressor, n_data_to_verify)
     mc_opt_interface = RegressorInterface(pipeline.ground_truth_regressor, skip_cache)
-    # Load and sample verification dataset
+    # Load and sample verification dataset. WARNING: You have also a verification dataset in pipeline. Don't boiler code.
     verification_dataset = ut.load_dataset_for_regressor(verification_data_path)
     first_verification = verification_dataset.sample(n=n_data_to_verify) if len(verification_dataset) > n_samples else verification_dataset
 

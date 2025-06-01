@@ -1,7 +1,7 @@
 import time
 import numpy as np
 import pandas as pd
-from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.algorithms.nsga2 import NSGA2
 from pymoo.core.callback import Callback
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.optimize import minimize
