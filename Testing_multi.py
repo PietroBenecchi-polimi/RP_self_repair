@@ -1,5 +1,4 @@
 from self_repair.self_repair_multi import run_oversampling_pipeline
-import matplotlib.pyplot as plt
 import pickle
 import os
 import pandas as pd
@@ -43,7 +42,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], i
                 n_samples=s_points,
                 data_type_second_validation=invalid_configs_validation,
                 points_regressor=r_points,
-                skip_cache=True
+                skip_cache=False
             )
 
             stats_per_points.append({

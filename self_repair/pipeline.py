@@ -59,9 +59,9 @@ class Pipeline:
             LimeBasedOversampling,
             KDEOversampling,
             #SmoteOversampling,
-            ADASYNOversampling,
-            BorderlineSMOTEOversampling,
-            ClusterSMOTEOversampling
+            # ADASYNOversampling,
+            # BorderlineSMOTEOversampling,
+            # ClusterSMOTEOversampling
         ]
 
         results_dict = {}
