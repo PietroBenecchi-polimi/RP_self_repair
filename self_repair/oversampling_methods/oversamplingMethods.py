@@ -8,7 +8,7 @@ from imblearn.over_sampling import SMOTE, ADASYN, BorderlineSMOTE
 from self_repair.oversampling_methods.LIME import explain_prediction_with_lime
 from utils.datacleaner import get_transformation_rules
 import utils.datacleaner as dc
-
+from collections import Counter
 with open('data/hmtfactor_config.json', 'r') as file:
     factors = dict(json.load(file))
 
@@ -141,6 +141,8 @@ class SmoteBasedOversampling(OversamplingMethod):
     def __init__(self, unbalanced_dataset: pd.DataFrame = pd.DataFrame()):
         super().__init__()
         self.unbalanced_dataset = unbalanced_dataset
+    def run_oversampling(self, n_samples):
+        pass
 
 class SmoteOversampling(SmoteBasedOversampling):
     def __init__(self, unbalanced_dataset: pd.DataFrame):
@@ -164,14 +166,18 @@ class ADASYNOversampling(SmoteBasedOversampling):
         super().__init__(unbalanced_dataset)
         self.name_id = "ADASYN"
 
-    def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
-        df = df.sample(n_samples) if len(df) > n_samples else df
+    def run_oversampling(self, n_samples: int) -> pd.DataFrame:
+        df = self.unbalanced_dataset.sample(n_samples) if len(self.unbalanced_dataset) > n_samples else self.unbalanced_dataset
         df.reset_index(drop=True)
         X = df.drop(columns=["SCS"])
         y = df["SCS"]
         y_class = (y > 0.5).astype(int)
 
-        ada = ADASYN(sampling_strategy='minority', random_state=42)
+        # count how many samples are in the minority class
+        minority_count = Counter(y_class)[1]
+        n_neighbors = min(5, minority_count - 1)  # ensure it doesn't exceed available samples
+
+        ada = ADASYN(sampling_strategy='minority', random_state=42, n_neighbors=n_neighbors)
         X_res, y_res = ada.fit_resample(X, y_class)
 
         df_resampled = X_res.copy()
@@ -183,8 +189,8 @@ class BorderlineSMOTEOversampling(SmoteBasedOversampling):
         super().__init__(unbalanced_dataset)
         self.name_id = "BorderlineSMOTE"
 
-    def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
-        df = df.sample(n_samples) if len(df) > n_samples else df
+    def run_oversampling(self, n_samples: int) -> pd.DataFrame:
+        df = self.unbalanced_dataset.sample(n_samples) if len(self.unbalanced_dataset) > n_samples else self.unbalanced_dataset
         df.reset_index(drop=True)
         X = df.drop(columns=["SCS"])
         y = df["SCS"]
@@ -202,8 +208,8 @@ class ClusterSMOTEOversampling(SmoteBasedOversampling):
         super().__init__(unbalanced_dataset)
         self.name_id = "ClusterSMOTE"
 
-    def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
-        df = df.sample(n_samples) if len(df) > n_samples else df
+    def run_oversampling(self, n_samples: int) -> pd.DataFrame:
+        df = self.unbalanced_dataset.sample(n_samples) if len(self.unbalanced_dataset) > n_samples else self.unbalanced_dataset
         df.reset_index(drop=True)
         X = df.drop(columns=["SCS"])
         y = df["SCS"]

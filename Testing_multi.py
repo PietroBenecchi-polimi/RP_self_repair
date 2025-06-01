@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import sys
 from typing import List, Dict
+from self_repair.stats import Stat
 from utils.rp_logger import logger
 from visualization.visualize_methods import *
 import logging
@@ -61,18 +62,16 @@ def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
     for experiment in stats_per_points:
         r_points = experiment['regressor_points']
         s_points = experiment['resampling_points']
-        
-        for stat in experiment['stats']:
-            method = stat['method']
-            if 'epsilon_array' in stat:
-                for epsilon in stat['epsilon_array']:  # Process each epsilon value individually
-                    data.append({
-                        'Method': method,
-                        'Regressor Points': r_points,
-                        'Resampling Points': s_points,
-                        'Epsilon': epsilon  # Individual epsilon values
-                    })
-    
+        stats: list[Stat] = experiment['stats']
+        for stat in stats:
+            method: str = stat.get_method_name()
+            for epsilon in stat.get_epsilon_points():  # Process each epsilon value individually
+                data.append({
+                    'Method': method,
+                    'Regressor Points': r_points,
+                    'Resampling Points': s_points,
+                    'Epsilon': epsilon  # Individual epsilon values
+                })
     return pd.DataFrame(data)
 
 def main():
@@ -89,8 +88,6 @@ def main():
     standard_stats = run_experiments(regressor_points, resampling_points, "first_verification", test_name=test_name)
     invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs", test_name=test_name)
 
-    # Create a MaxPlot of epsilon over resampling points
-
     # Process results into DataFrames
     df_standard = process_results(standard_stats)
     df_invalid = process_results(invalid_stats)
@@ -104,8 +101,7 @@ def main():
             df_s = df_standard[(df_standard['Regressor Points'] == r) & (df_standard['Resampling Points'] == s)]
             df_i = df_invalid[(df_invalid['Regressor Points'] == r) & (df_invalid['Resampling Points'] == s)]
             # Check if both DataFrames are not empty before plotting
-            if not df_s.empty and not df_i.empty:
-                visualize_comparison_violin(df_i, df_s, r_points=r, s_points=s, test_name=test_name)
+            visualize_comparison_box(df_i, df_s, r_points=r, s_points=s, test_name=test_name)
                 
     # Combine for general plotting
     df_combined = pd.concat([df_standard, df_invalid])

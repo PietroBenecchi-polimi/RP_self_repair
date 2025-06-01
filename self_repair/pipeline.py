@@ -69,13 +69,13 @@ class Pipeline:
         def run_method(cls: OversamplingMethod):
             if cls == LimeBasedOversampling:
                 instance: OversamplingMethod = cls(self.regressor)
-                instance.run_oversampling(df=self.initial_test_set.copy(), n_samples=n_samples)
+                instance.run_oversampling(df=invalid_configurations.copy(), n_samples=n_samples)
             elif issubclass(cls, SmoteBasedOversampling):
-                instance: SmoteBasedOversampling = cls(invalid_configurations)
-                instance.run_oversampling(df=self.initial_test_set, n_samples=n_samples)
+                instance: SmoteBasedOversampling = cls(self.train__data)
+                instance.run_oversampling(n_samples=n_samples)
             else:
                 instance: OversamplingMethod = cls()
-                instance.run_oversampling(df=self.initial_test_set.copy(), n_samples=n_samples)
+                instance.run_oversampling(df=invalid_configurations.copy(), n_samples=n_samples)
             return instance.name_id, instance.getResampling()
 
         with ThreadPoolExecutor() as executor:
@@ -87,7 +87,7 @@ class Pipeline:
         return results_dict
     
     def retrain_regressor(self, oversampling: pd.DataFrame):
-        combined_dataset = pd.concat([oversampling, self.initial_test_set], ignore_index=True)
+        combined_dataset = pd.concat([oversampling, self.train__data], ignore_index=True)
         X = combined_dataset.drop(columns=["SCS"])
         y = combined_dataset["SCS"]
 
