@@ -6,6 +6,7 @@ import utils.generateData as gd
 from self_repair.pipeline import Pipeline
 from self_repair.stats import Stat
 from self_repair.mc_opt_interface import MC_OPT_INTERFACE
+import utils.generateData as gd
 
 # imports 
 from utils.rp_logger import logger
@@ -32,7 +33,12 @@ def oversample_retraing_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeli
     # get ground truth
     new_groundtruth = interface.mc_results_from_configs(new_opt_configs_results.drop(columns=["SCS"]), pipeline.ground_truth_regressor)
     _, epsilon_array = pipeline.validate_configurations(new_opt_configs_results, new_groundtruth)
-    return Stat(oversampling_method_name, epsilon_array)
+
+    new_data = gd.generate_neighbours_from_config(test_dataset.iloc[[0]].drop(columns=["SCS"]), pipeline.regressor, neighbours_to_generate = 20)
+    new_data_SCS = mc.mc_results_from_configs(new_data.drop(columns=["SCS"]), pipeline.ground_truth_regressor)
+    _, neighbours_array = pipeline.validate_configurations(new_data, new_data_SCS)
+
+    return Stat(oversampling_method_name, epsilon_array), Stat(f"{oversampling_method_name}_neighbours", neighbours_array)
 
 def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_validation: str, points_regressor, skip_cache = True):
     # stats contains stats.py objects >
@@ -53,10 +59,17 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     invalid_configs, epsilon_array = p.validate_configurations(opt_configs, ground_truth_first_test)
     
     # contains <method_name, generated_data> without SCS column
-    generated_data_methods = p.oversample(n_samples, invalid_configs.iloc[0])
+    generated_data_methods = p.oversample(n_samples, invalid_configs.iloc[[0]])
+
+    new_data = gd.generate_neighbours_from_config(invalid_configs.iloc[[0]].drop(columns=["SCS"]), p.regressor, neighbours_to_generate = 20)
+    new_data_SCS = mc.mc_results_from_configs(new_data.drop(columns=["SCS"]), p.ground_truth_regressor)
+    _, neighbours_array = p.validate_configurations(opt_configs, new_data_SCS)
 
     # Just add the first validation stats
-    stats.append(Stat("no oversampling", epsilon_array[0]))
+    initial_stats = [
+        Stat("no oversampling", epsilon_array[0]),
+        Stat("neighbours", neighbours_array)
+    ]
 
     args = [
         (
@@ -72,9 +85,10 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     start_time = time.time()
 
     with multiprocessing.Pool(processes=len(generated_data_methods)) as pool:
-        stats = pool.starmap(oversample_retraing_validation, args)
+        parallel_stats = pool.starmap(oversample_retraing_validation, args)
 
     end_time = time.time()
     logger.debug(f"Oversampling and validation completed in {(end_time - start_time):.2f} seconds")
 
-    return stats
+    all_stats = initial_stats + parallel_stats
+    return all_stats
