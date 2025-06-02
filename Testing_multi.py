@@ -42,7 +42,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], i
                 n_samples=s_points,
                 data_type_second_validation=invalid_configs_validation,
                 points_regressor=r_points,
-                skip_cache=False
+                skip_cache=True
             )
 
             stats_per_points.append({
