@@ -2,12 +2,13 @@ import json
 from utils.datacleaner import get_transformation_rules
 import numpy as np
 import pandas as pd
+from utils.rp_logger import logger
 
 with open('data/hmtfactor_config.json', 'r') as file:
     factors = dict(json.load(file))
 
 def generate_neighbours_from_config(config: pd.DataFrame, regressor, neighbours_to_generate=20):
-    neighbours = pd.DataFrame
+    neighbours = pd.DataFrame()
 
     transformation_rules = get_transformation_rules()
 
@@ -33,12 +34,15 @@ def generate_neighbours_from_config(config: pd.DataFrame, regressor, neighbours_
                 center = config[factor_key]
                 col_min = center * 0.9
                 col_max = center * 1.1
-            # Sample around the target value, but within allowed range
+            # sample around the target value, but within allowed range
             center = config[factor_key]
             spread = (col_max - col_min) * 0.1
             low = max(col_min, center - spread)
             high = min(col_max, center + spread)
-            if is_int:
+            if low >= high:
+                # fallback: it happens for PSC_TAU, strange
+                neighbours[factor_key] = np.repeat(center, neighbours_to_generate)
+            elif is_int:
                 neighbours[factor_key] = np.random.randint(int(np.ceil(low)), int(np.floor(high)) + 1, neighbours_to_generate)
             else:
                 neighbours[factor_key] = np.random.uniform(low, high, neighbours_to_generate)
