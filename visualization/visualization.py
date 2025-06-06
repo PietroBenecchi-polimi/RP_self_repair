@@ -28,28 +28,6 @@ def process_oversampling_results(stats_per_points: List[Dict], validation_type: 
 
     return pd.DataFrame(data)
 
-def process_results_test2(stats_per_points: List[Dict], validation_type: str) -> pd.DataFrame:
-    """Process results into a DataFrame suitable for visualization."""
-    data = []
-
-    for experiment in stats_per_points:
-        r_points = experiment['regressor_points']
-        s_points = experiment['resampling_points']
-
-        for stat in experiment['stats']:
-            method = stat['method']
-            epsilon = stat['epsilon'] 
-            data.append({
-                'Method': method,
-                'Regressor Points': r_points,
-                'Resampling Points': s_points,
-                'Epsilon': epsilon,
-                'Validation Type': validation_type
-            })
-
-    return pd.DataFrame(data)
-
-
 def visualize_comparison_box(df_invalid: pd.DataFrame, df_standard: pd.DataFrame, r_points: int, s_points: int, test_name: str) -> None:
     """Create a box plot showing both validation types for a specific configuration."""
     df_invalid = df_invalid[(df_invalid['Regressor Points'] == r_points) & (df_invalid['Resampling Points'] == s_points)]

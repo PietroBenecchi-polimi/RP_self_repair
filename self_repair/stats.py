@@ -18,6 +18,17 @@ class Stat:
             else:
                 self.n_mission_failed += 1
 
+    def __repr__(self):
+        return (
+            f"Stat(\n"
+            f"  method_name='{self.method_name}',\n"
+            f"  epsilon_points={self.epsilon_points},\n"
+            f"  th_mission_satisfied={self.th_mission_satisfied},\n"
+            f"  n_mission_success={self.n_mission_success},\n"
+            f"  n_mission_failed={self.n_mission_failed}\n"
+            f")"
+        )
+
     def get_method_name(self) -> str:
         return self.method_name
 
