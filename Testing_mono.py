@@ -7,8 +7,9 @@ import utils.saving_data as sd
 
 
 def run_experiments(regressor_points: List[int], resampling_points: List[int], second_test_data_str: str, test_name: str) -> List[Dict]:
-    save_path = f"tester_results/data/data_{test_name}/oversampling_results_{second_test_data_str}.json"
+    save_path = f"tester_results/data/data_{test_name}/oversampling_results_{second_test_data_str}.pkl"
     os.makedirs(f"tester_results/data/data_{test_name}", exist_ok=True)
+    stats_per_points_resampling = []
 
     for r_points in regressor_points:
         for s_points in resampling_points:
@@ -22,7 +23,15 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
                 skip_cache=True,
             )
 
-            sd.save_results(stats, save_path)
+            stats_per_points_resampling.append(
+                {
+                    "regressor_points": r_points,
+                    "resampling_points": s_points,
+                    "stats": stats
+                }
+            )
+
+            sd.save_results(stats_per_points_resampling, save_path)
 
 
 def mono_test_pipeline():

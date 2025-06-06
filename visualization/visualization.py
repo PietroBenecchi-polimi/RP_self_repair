@@ -7,6 +7,7 @@ from typing import List, Dict
 from matplotlib import cm
 from utils.rp_logger import logger
 
+## What is validation type? And why should i pass it as an argument?
 def process_oversampling_results(stats_per_points: List[Dict], validation_type: str) -> pd.DataFrame:
     """Process oversampling experiment results into a DataFrame for visualization."""
     data = []
@@ -16,8 +17,8 @@ def process_oversampling_results(stats_per_points: List[Dict], validation_type: 
         s_points = experiment['resampling_points']
 
         for stat in experiment['stats']:
-            method = stat['method']
-            epsilon = stat['epsilon']
+            method = stat[0]
+            epsilon = stat[1]
             data.append({
                 'Method': method,
                 'Regressor Points': r_points,
