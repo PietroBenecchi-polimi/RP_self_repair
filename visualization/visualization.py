@@ -5,29 +5,28 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import List, Dict
 from matplotlib import cm
-from utils.rp_logger import logger
+from self_repair.stats import Stat
 
-## What is validation type? And why should i pass it as an argument?
-def process_oversampling_results(stats_per_points: List[Dict], validation_type: str) -> pd.DataFrame:
-    """Process oversampling experiment results into a DataFrame for visualization."""
+def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
+    """Process results into a DataFrame"""
     data = []
-
+    
     for experiment in stats_per_points:
         r_points = experiment['regressor_points']
         s_points = experiment['resampling_points']
-
-        for stat in experiment['stats']:
-            method = stat[0]
-            epsilon = stat[1]
-            data.append({
-                'Method': method,
-                'Regressor Points': r_points,
-                'Resampling Points': s_points,
-                'Epsilon': epsilon,
-                'Validation Type': validation_type
-            })
-
+        stats: list[Stat] = experiment['stats']
+        for stat in stats:
+            method: str = stat.get_method_name()
+            for epsilon in stat.get_epsilon_points():  # Process each epsilon value individually
+                data.append({
+                    'Method': method,
+                    'Regressor Points': r_points,
+                    'Resampling Points': s_points,
+                    'Epsilon': epsilon  # Individual epsilon values
+                })
+                
     return pd.DataFrame(data)
+
 
 def visualize_comparison_box(df_invalid: pd.DataFrame, df_standard: pd.DataFrame, r_points: int, s_points: int, test_name: str) -> None:
     """Create a box plot showing both validation types for a specific configuration."""
