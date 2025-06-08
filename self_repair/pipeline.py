@@ -26,10 +26,10 @@ class Pipeline:
     def __init__(self, training_dataset_path: str, test_data_path: str, points_regressor: int, n_data_to_verify: int):
         dataset = ut.load_dataset_for_regressor(training_dataset_path)
         self.ground_truth_regressor = self.__train_new_regressor(dataset)
-        self.train__data = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
-        self.regressor = self.__train_new_regressor(self.train__data)
+        self.train_data = dataset.sample(points_regressor, random_state=128).reset_index(drop=True)
+        self.regressor = self.__train_new_regressor(self.train_data)
         # It is a small set based on test_data_path. The size is determined by n_data_to_verify.
-        self.initial_test_set = ut.load_dataset_for_regressor(test_data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
+        self.test_set = ut.load_dataset_for_regressor(test_data_path).sample(n_data_to_verify, random_state=128).reset_index(drop=True)
         
     def validate_configurations(self, opt_results, ground_truth):
         epsilon_array = []
@@ -52,13 +52,15 @@ class Pipeline:
 
         return invalid_results_df, epsilon_array
 
-    ## Please provide comments
+    ## Run all oversampling methods in parallel. Is it parallel? 
+    ## Output: dictionary <method_name, new_data>
+    ## IMPORTANT: data is generated without metrics(SCS, FTG)
     def oversample(self, n_samples: int, invalid_configurations: pd.DataFrame):
         methods = [
             RandomOversampling,
             LimeBasedOversampling,
             KDEOversampling,
-            #SmoteOversampling,
+            # SmoteOversampling,
             # ADASYNOversampling,
             # BorderlineSMOTEOversampling,
             # ClusterSMOTEOversampling
@@ -93,5 +95,6 @@ class Pipeline:
 
         regressor_copy = clone(self.regressor)
         regressor_copy.fit(X, y)
-
-        return regressor_copy
+        self.regressor = regressor_copy
+        
+        return self.regressor
