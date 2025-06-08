@@ -48,18 +48,19 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     p = Pipeline(training_dataset_path = "data/dataset1000.csv",
                            test_data_path = "data/initial_configurations_to_improve.csv", points_regressor = points_regressor, n_data_to_verify = n_data_to_verify)
 
-    model_checker = mc.RegressorInterface(p.ground_truth_regressor, skip_cache)
+    # model__checker = mc.RegressorInterface(p.ground_truth_regressor, skip_cache)
+    model_checker = mc.ModelCheckerInterface(skip_cache)
 
     # Comments --> to refactor
     opt_configs = model_checker.opt_optimization(p.test_set, p.regressor, f"regressor_{points_regressor}")
-    ground_truth_first_test = model_checker.mc_results_from_configs(opt_configs.drop(columns=["SCS"]))
+    ground_truth_first_test = model_checker.mc_results_from_configs(opt_configs.drop(columns=["SCS"]), "null")
     invalid_configs, epsilon_array = p.validate_configurations(opt_configs, ground_truth_first_test)
     
     # contains <method_name, generated_data> without SCS column
     generated_data_methods = p.oversample(n_samples, invalid_configs.iloc[[0]])
 
     new_data = gd.generate_neighbours_from_config(invalid_configs.iloc[[0]].drop(columns=["SCS"]), p.regressor, neighbours_to_generate = 20)
-    new_data_SCS = model_checker.mc_results_from_configs(new_data.drop(columns=["SCS"]))
+    new_data_SCS = model_checker.mc_results_from_configs(new_data.drop(columns=["SCS"]), "null")
     _, neighbours_array = p.validate_configurations(opt_configs, new_data_SCS)
 
     # Just add the first validation stats
@@ -87,5 +88,5 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     end_time = time.time()
     logger.debug(f"Oversampling and validation completed in {(end_time - start_time):.2f} seconds")
 
-    all_stats = initial_stats + parallel_stats
+    all_stats = initial_stats + [stat for pair in parallel_stats for stat in pair]  # Flatten the list of tuples
     return all_stats
