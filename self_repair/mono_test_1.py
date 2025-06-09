@@ -7,6 +7,7 @@ from self_repair.pipeline import Pipeline
 from self_repair.stats import Stat
 from self_repair.mc_opt_interface import MC_OPT_INTERFACE
 import utils.generateData as gd
+from utils.datacleaner import fromOptimizerToMC
 
 # imports 
 from utils.rp_logger import logger
@@ -31,11 +32,11 @@ def oversample_retraing_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeli
     # optimization + validation
     new_opt_configs_results = interface.opt_optimization(test_dataset, new_regressor, f"{oversampling_method_name}_{len(test_dataset)}")
     # get ground truth
-    new_groundtruth = interface.mc_results_from_configs(new_opt_configs_results.drop(columns=["SCS"]))
+    new_groundtruth = interface.mc_results_from_configs(new_opt_configs_results.drop(columns=["SCS"]), "null")
     _, epsilon_array = pipeline.validate_configurations(new_opt_configs_results, new_groundtruth)
 
     new_data = gd.generate_neighbours_from_config(test_dataset.iloc[[0]].drop(columns=["SCS"]), pipeline.regressor, neighbours_to_generate = 20)
-    new_data_SCS = interface.mc_results_from_configs(new_data.drop(columns=["SCS"]))
+    new_data_SCS = interface.mc_results_from_configs(new_data.drop(columns=["SCS"]), "null")
     _, neighbours_array = pipeline.validate_configurations(new_data, new_data_SCS)
 
     return Stat(oversampling_method_name, epsilon_array), Stat(f"{oversampling_method_name}_neighbours", neighbours_array)
@@ -60,6 +61,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     generated_data_methods = p.oversample(n_samples, invalid_configs.iloc[[0]])
 
     new_data = gd.generate_neighbours_from_config(invalid_configs.iloc[[0]].drop(columns=["SCS"]), p.regressor, neighbours_to_generate = 20)
+    # cancel if using regressor
     new_data_SCS = model_checker.mc_results_from_configs(new_data.drop(columns=["SCS"]), "null")
     _, neighbours_array = p.validate_configurations(opt_configs, new_data_SCS)
 

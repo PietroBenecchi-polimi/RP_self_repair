@@ -20,7 +20,7 @@ class ModelCheckerInterface(MC_OPT_INTERFACE):
         super().__init__()
         self.skip_cache = skip_cache
 
-    def mc_results_from_configs(self, new_configs: pd.DataFrame, cache_file_name: str) -> pd.DataFrame:
+    def mc_results_from_configs(self, new_configs: pd.DataFrame, cache_file_name: str = "null") -> pd.DataFrame:
         cache_path = os.path.join("self_repair/cache/mc", f"{cache_file_name}.csv")
         
         if not self.skip_cache:

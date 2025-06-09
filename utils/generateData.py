@@ -50,6 +50,6 @@ def generate_neighbours_from_config(config: pd.DataFrame, regressor, neighbours_
             # Fallback: just repeat the target value
             neighbours[factor_key] = np.repeat(config[factor_key], neighbours_to_generate)
 
-    neighbours['SCS'] = regressor.predict(neighbours)
+    neighbours['SCS'] = 0
 
     return neighbours
