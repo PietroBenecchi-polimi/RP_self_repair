@@ -89,9 +89,9 @@ class Pipeline:
         return results_dict
     
     def retrain_regressor(self, oversampling: pd.DataFrame):
-        self.train_data = pd.concat([oversampling, self.train_data], ignore_index=True)
-        X = self.train_data.drop(columns=["SCS"])
-        y = self.train_data["SCS"]
+        combined_dataset = pd.concat([oversampling, self.train__data], ignore_index=True)
+        X = combined_dataset.drop(columns=["SCS"])
+        y = combined_dataset["SCS"]
 
         regressor_copy = clone(self.regressor)
         regressor_copy.fit(X, y)
