@@ -6,6 +6,7 @@ import seaborn as sns
 from typing import List, Dict
 from matplotlib import cm
 from utils.rp_logger import logger
+from self_repair.stats import Stat
 
 def process_oversampling_results(stats_per_points: List[Dict], validation_type: str) -> pd.DataFrame:
     """Process oversampling experiment results into a DataFrame for visualization."""
@@ -14,15 +15,16 @@ def process_oversampling_results(stats_per_points: List[Dict], validation_type: 
     for experiment in stats_per_points:
         r_points = experiment['regressor_points']
         s_points = experiment['resampling_points']
-
-        for stat in experiment['stats']:
-            method = stat['method']
-            epsilon = stat['epsilon']
+        stats: list[Stat] = experiment['stats']
+        for stat in stats:
+            method = stat.get_method_name()
             data.append({
                 'Method': method,
                 'Regressor Points': r_points,
                 'Resampling Points': s_points,
-                'Epsilon': epsilon,
+                'Epsilon': stat.get_epsilon_points(),
+                'Mission Success': stat.get_n_mission_success(),
+                'Mission Failed': stat.get_n_mission_failed(),
                 'Validation Type': validation_type
             })
 
