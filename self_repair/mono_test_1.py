@@ -87,5 +87,5 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     end_time = time.time()
     logger.debug(f"Oversampling and validation completed in {(end_time - start_time):.2f} seconds")
 
-    all_stats = initial_stats + parallel_stats
+    all_stats = initial_stats + [stat for pair in parallel_stats for stat in pair]  # Flatten the list of tuples
     return all_stats

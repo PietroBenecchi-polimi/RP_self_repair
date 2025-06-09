@@ -16,15 +16,13 @@ def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
         s_points = experiment['resampling_points']
         stats: list[Stat] = experiment['stats']
         for stat in stats:
-            method: str = stat.get_method_name()
-            for epsilon in stat.get_epsilon_points():  # Process each epsilon value individually
-                data.append({
-                    'Method': method,
-                    'Regressor Points': r_points,
-                    'Resampling Points': s_points,
-                    'Epsilon': epsilon  # Individual epsilon values
-                })
-                
+            data.append({
+                'Method': stat.get_method_name(),
+                'Regressor Points': r_points,
+                'Resampling Points': s_points,
+                'Epsilons': stat.get_epsilon_points()
+            })
+            
     return pd.DataFrame(data)
 
 
