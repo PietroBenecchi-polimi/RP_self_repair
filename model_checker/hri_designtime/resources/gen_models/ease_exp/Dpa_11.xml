@@ -5079,8 +5079,8 @@ clock t_act;
 
 //Human-Robot Distance Parameters
 const double safetyDistance = 2.0;
-const double stopDistance = 6.86;
-const double restartDistance = 4.25;
+const double stopDistance = 5.27;
+const double restartDistance = 2.09;
 int recipientStages = 0;
 
 //Recharging Policy Parameters
@@ -5090,8 +5090,8 @@ const double failBattery = 11.0;
 
 //Fatigue-Monitoring Parameters
 const double failFatigue = 0.97;
-const double stopFatigue = 0.65;
-const double resumeFatigue = 0.33;
+const double stopFatigue = 0.66;
+const double resumeFatigue = 0.24;
 
 
 /**
@@ -5708,8 +5708,8 @@ void publish() {
 </template>
 	<system>
 // Robot Instances
-r_1 = Robot(1, 33.290832448981135, 33.290832448981135, 2500.00, 510.00);
-b_r_1 = Battery(1, 11.72840953900712);
+r_1 = Robot(1, 57.67551962461638, 57.67551962461638, 2500.00, 510.00);
+b_r_1 = Battery(1, 11.702056021396793);
 r_pub_1 = ROS_SensPub(1, 0.0, 0.00);
 c_pub = ROS_SensPub(0, 0.5, 0.01);
 
@@ -5727,11 +5727,11 @@ opchk_1 = OpChk(1, 1, 0);
 
 // Human Instances
 // -&gt; DEFINE HUMAN PATTERNS
-h_1 = Human_Follower(1, 70.2295607816696, 3, 8, -1, -1);
-h_2 = Human_Leader(2, 76.02193853271687, 6, 7, -1, -1);
-h_3 = Human_Leader(3, 76.02193853271687, 6, 7, 2, -1);
-h_4 = Human_Leader(4, 70.2295607816696, 3, 8, 1, -1);
-h_5 = Human_Follower(5, 70.2295607816696, 3, 8, 1, -1);
+h_1 = Human_Follower(1, 58.19302009863859, 5, 7, -1, -1);
+h_2 = Human_Leader(2, 93.63167977374482, 2, 8, -1, -1);
+h_3 = Human_Leader(3, 93.63167977374482, 2, 8, 2, -1);
+h_4 = Human_Leader(4, 58.19302009863859, 5, 7, 1, -1);
+h_5 = Human_Follower(5, 58.19302009863859, 5, 7, 1, -1);
 h_pub_pos = ROS_SensPub(2, 0.5, 0.01);
 h_pub_ftg = ROS_SensPub(3, 0.5, 0.01);
 
