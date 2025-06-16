@@ -6,6 +6,7 @@ import seaborn as sns
 from typing import List, Dict
 from matplotlib import cm
 from self_repair.stats import Stat
+plt.set_loglevel("warning")
 
 def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
     """Flatten the list of stats into a DataFrame suitable for boxplotting."""

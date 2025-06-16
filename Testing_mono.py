@@ -32,7 +32,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
                 logger.warning(f"Skipping already processed combination: regressor={r_points}, resampling={s_points}")
                 continue
             stats = run_oversampling_pipeline(
-                n_data_to_verify=5,
+                n_data_to_verify=15,
                 n_samples=s_points,
                 data_type_second_validation=second_test_data_str,
                 points_regressor=r_points,
@@ -52,7 +52,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
 
 def mono_test_pipeline():
     regressor_points = [1000]
-    resampling_points = [5, 10, 20, 30, 50, 70, 100, 150, 200]
+    resampling_points = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     if len(sys.argv) < 2:
        logger.error("Please, insert the test name as an argument. It is used to save the results.")

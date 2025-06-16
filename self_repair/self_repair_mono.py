@@ -46,11 +46,11 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     p = Pipeline(training_dataset_path = "data/dataset1000.csv",
                            test_data_path = "data/initial_configurations_to_improve.csv", points_regressor = points_regressor, n_data_to_verify = n_data_to_verify)
 
-    mc_opt_interface = mc.ModelCheckerInterface(skip_cache)
+    mc_opt_interface = mc.RegressorInterface(p.ground_truth_regressor, skip_cache)
 
     # Comments --> to refactor
-    opt_configs = mc_opt_interface.opt_optimization(p.test_set, p.regressor, f"regressor_{points_regressor}", skip_cache)
-    ground_truth_first_test = mc_opt_interface.mc_results_from_configs(opt_configs.drop(columns=["SCS"]), f"regressor_{points_regressor}")
+    opt_configs = mc_opt_interface.opt_optimization(p.test_set, p.regressor, f"regressor_{points_regressor}")
+    ground_truth_first_test = mc_opt_interface.mc_results_from_configs(opt_configs.drop(columns=["SCS"]))
     invalid_configs, epsilon_array = p.validate_configurations(opt_configs, ground_truth_first_test)
     
     # contains <method_name, generated_data> without SCS column

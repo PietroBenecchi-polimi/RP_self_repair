@@ -95,7 +95,7 @@ class Pipeline:
         
         return self.regressor
 
-    def generate_neighbours_from_config(self, config: pd.DataFrame, neighbours_to_generate=20):
+    def generate_neighbours_from_config(self, config: pd.DataFrame, neighbours_to_generate=20, offset=0.025):
         with open('data/hmtfactor_config.json', 'r') as file:
             factors = dict(json.load(file))
         neighbours = pd.DataFrame()
@@ -110,23 +110,20 @@ class Pipeline:
 
         for factor_key in config.index:
             if factor_key in transformation_rules:
-                # Categorical variable: sample from allowed values. Sure of random choice.
-                values = list(transformation_rules[factor_key].values())
-                neighbours[factor_key] = np.random.choice(values, neighbours_to_generate)
+                neighbours[factor_key] = [config[factor_key]] * neighbours_to_generate
             elif factor_key in factors:
                 factor_info = factors[factor_key]
                 # Determine type and range
                 col_min = factor_info.get("min", None)
                 col_max = factor_info.get("max", None)
                 is_int = factor_info.get("type", "float") == "int"
-                # If no min/max, fallback to target value ±10%
-                if col_min is None or col_max is None:
-                    center = config[factor_key]
-                    col_min = center * 0.9
-                    col_max = center * 1.1
-                # sample around the target value, but within allowed range
+                # If no min/max, fallback to target value ±offset
                 center = config[factor_key]
-                spread = (col_max - col_min) * 0.1
+                if col_min is None or col_max is None:
+                    col_min = center * (1 - offset)
+                    col_max = center * (1 + offset)
+                # sample around the target value, but within allowed range
+                spread = (col_max - col_min) * offset
                 low = max(col_min, center - spread)
                 high = min(col_max, center + spread)
                 if low >= high:

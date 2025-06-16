@@ -12,7 +12,7 @@ class MC_OPT_INTERFACE(ABC):
         pass
 
     @abstractmethod
-    def opt_optimization(self, new_configs: pd.DataFrame, cache_file_name: str, skip_caching=False) -> pd.DataFrame:
+    def opt_optimization(self, new_configs: pd.DataFrame, cache_file_name: str, skip_caching=True) -> pd.DataFrame:
         pass
 
 class ModelCheckerInterface(MC_OPT_INTERFACE):
@@ -41,7 +41,7 @@ class ModelCheckerInterface(MC_OPT_INTERFACE):
         
         return result
 
-    def opt_optimization(self, new_configs: pd.DataFrame, scs_regressor, cache_file_name: str, skip_caching=False) -> pd.DataFrame:
+    def opt_optimization(self, new_configs: pd.DataFrame, scs_regressor, cache_file_name: str, skip_caching=True) -> pd.DataFrame:
         cache_dir = "self_repair/cache/opt"
         cache_path = os.path.join(cache_dir, f"{cache_file_name}.csv")
 
