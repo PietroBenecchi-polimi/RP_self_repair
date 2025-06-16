@@ -78,25 +78,25 @@ def fromMCtoOptimizer(data) -> pd.DataFrame:
     data['SCS'] = data['PRSCS_LOWER_BOUND'] + data['PRSCS_UPPER_BOUND'] / 2
 
     # Split AGE/STAT columns back into original components
-    data['HUM_1_FTG'] = data['FTG_HUM_1'].astype(str)
-    data['HUM_2_FTG'] = data['FTG_HUM_2'].astype(str)
+    data['HUM_1_FTG'] = data['HUM_1_FTG'].astype(str)
+    data['HUM_2_FTG'] = data['HUM_2_FTG'].astype(str)
 
-    data[['HUM_1_AGE', 'HUM_1_STA']] = data['AGE/STAT 1'].str.split('/', expand=True)
-    data[['HUM_2_AGE', 'HUM_2_STA']] = data['AGE/STAT 2'].str.split('/', expand=True)
+    data[['HUM_1_AGE', 'HUM_1_STA']] = data['HUM_1_FTG'].str.split('/', expand=True)
+    data[['HUM_2_AGE', 'HUM_2_STA']] = data['HUM_2_FTG'].str.split('/', expand=True)
     
     data = data.rename(columns={'PROGRESS': 'PRGS'})
 
     # Split Position columns back into original X and Y
-    data['Position 1'] = data['Position 1'].astype(str)
-    data['Position 2'] = data['Position 2'].astype(str)
+    data['HUM_1_POS'] = data['HUM_1_POS'].astype(str)
+    data['HUM_2_POS'] = data['HUM_2_POS'].astype(str)
 
-    data[['HUM_1_POS_X', 'HUM_1_POS_Y']] = data['Position 1'].str.split(', ', expand=True).astype(float)
-    data[['HUM_2_POS_X', 'HUM_2_POS_Y']] = data['Position 2'].str.split(', ', expand=True).astype(float)
+    data[['HUM_1_POS_X', 'HUM_1_POS_Y']] = data['HUM_1_POS'].str.split(', ', expand=True).astype(float)
+    data[['HUM_2_POS_X', 'HUM_2_POS_Y']] = data['HUM_2_POS'].str.split(', ', expand=True).astype(float)
 
     # drop combined columns
-    data.drop(columns=['HUM_1_FTG', 'HUM_2_FTG', 'Position 1', 'Position 2', 'AGE/STAT 1', 'AGE/STAT 2'], inplace=True)
+    data.drop(columns=['HUM_1_FTG', 'HUM_2_FTG', 'HUM_1_POS', 'HUM_2_POS', 'HUM_1_FTG', 'HUM_2_FTG'], inplace=True)
 
-    # Remove columns scs and ftg(shoul be changed if test on fatigue)
+    # Remove columns scs and ftg(should be changed if test on fatigue)
     data.drop(columns=['PRSCS_LOWER_BOUND', 'PRSCS_UPPER_BOUND', 'FTG_HUM_1', 'FTG_HUM_2'], inplace=True)
     
     # Extract new columns

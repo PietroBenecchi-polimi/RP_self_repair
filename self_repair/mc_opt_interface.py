@@ -20,12 +20,12 @@ class ModelCheckerInterface(MC_OPT_INTERFACE):
         super().__init__()
         self.skip_cache = skip_cache
 
-    def mc_results_from_configs(self, new_configs: pd.DataFrame, cache_file_name: str) -> pd.DataFrame:
+    def mc_results_from_configs(self, new_configs: pd.DataFrame, cache_file_name: str = "null") -> pd.DataFrame:
         cache_path = os.path.join("self_repair/cache/mc", f"{cache_file_name}.csv")
         
         if not self.skip_cache:
             try:
-                result = pd.read_csv(f"/self_repair/cache/mc/{cache_file_name}.csv")
+                result = pd.read_csv(cache_path)
             except FileNotFoundError:
                 logger.warning(f"Cache miss on {cache_file_name}, MC will be used")
                 data_processed = dc.fromOptimizerToMC(new_configs)
@@ -33,10 +33,10 @@ class ModelCheckerInterface(MC_OPT_INTERFACE):
                 result.to_csv(cache_path, index=False)
                 result = dc.fromMCtoOptimizer(result)
         else:
-            logger.info(f"Skipping cache for {cache_file_name}, NSGA_II will be used")
+            logger.info(f"Skipping cache for {cache_file_name}, MC will be used")
             data_processed = dc.fromOptimizerToMC(new_configs)
             result = hmtf.run_mc_simulations(data_processed)
-            result.to_csv(f"/self_repair/cache/mc/{cache_file_name}.csv", index=False)
+            result.to_csv(cache_path, index=False)
             result = dc.fromMCtoOptimizer(result)
         
         return result
@@ -53,11 +53,11 @@ class ModelCheckerInterface(MC_OPT_INTERFACE):
                 result = pd.read_csv(cache_path)
                 logger.info(f"Cache hit: {cache_file_name}")
             except FileNotFoundError:
-                logger.warning(f"Cache miss on {cache_file_name}, Model Checker will be used")
+                logger.warning(f"Cache miss on {cache_file_name}, NSGA_II will be used")
                 result = optimize_configurations(new_configs.reset_index(drop=True), scs_regressor)
                 result.to_csv(cache_path, index=False)
         else:
-            logger.info(f"Skipping cache for {cache_file_name}, Model Checker will be used")
+            logger.info(f"Skipping cache for {cache_file_name}, NSGA_II will be used")
             result = optimize_configurations(new_configs.reset_index(drop=True), scs_regressor)
             result.to_csv(cache_path, index=False)
 

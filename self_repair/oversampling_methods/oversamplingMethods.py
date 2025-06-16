@@ -34,6 +34,7 @@ class OversamplingMethod:
 
     def setResampling(self, resampling):
         self.resampling = resampling
+        
     def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
         pass
 

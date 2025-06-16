@@ -1,5 +1,8 @@
 import configparser
 from typing import List, Tuple
+import threading
+import os
+
 
 from model_checker.hri_designtime.src.domain.hmtfactor import Configuration, HMTFactor, Metric
 from model_checker.hri_designtime.src.domain.query import Query
@@ -128,3 +131,35 @@ class Factor_Mgr:
         with open(DEST_PATH + scen_name + TPLT_EXT, 'w') as main_tplt:
             main_tplt.truncate(0)
             main_tplt.writelines(lines)
+
+    # Lock globale per sincronizzare l'accesso al file
+    file_lock = threading.Lock()
+
+    @classmethod
+    def fix_orch_params(cls, conf: Configuration, scen_name: str):
+        file_path = os.path.join(DEST_PATH, scen_name + TPLT_EXT)
+
+        with cls.file_lock:
+            lines = []
+            try:
+                with open(file_path, 'r') as main_tplt:
+                    lines = main_tplt.readlines()
+            except FileNotFoundError:
+                raise RuntimeError(f"Template file not found: {file_path}")
+
+            for f in conf.factors:
+                if f.hmt_id == 'ORCH_1_Dstop':
+                    i = lines.index('const double stopDistance = 6.0;\n')
+                    lines[i] = 'const double stopDistance = {:.2f};\n'.format(f.value)
+                elif f.hmt_id == 'ORCH_1_Drestart':
+                    i = lines.index('const double restartDistance = 3.0;\n')
+                    lines[i] = 'const double restartDistance = {:.2f};\n'.format(f.value)
+                elif f.hmt_id == 'ORCH_1_Fstop':
+                    i = lines.index('const double stopFatigue = 0.6;\n')
+                    lines[i] = 'const double stopFatigue = {:.2f};\n'.format(f.value)
+                elif f.hmt_id == 'ORCH_1_Frestart':
+                    i = lines.index('const double resumeFatigue = 0.3;\n')
+                    lines[i] = 'const double resumeFatigue = {:.2f};\n'.format(f.value)
+            # Scrivi il contenuto modificato
+            with open(file_path, 'w') as main_tplt:
+                main_tplt.writelines(lines)

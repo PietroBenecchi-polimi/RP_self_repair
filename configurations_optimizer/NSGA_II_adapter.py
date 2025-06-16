@@ -92,8 +92,8 @@ def process_dataframe(df):
 def optimize_configurations(
     df,
     regressor_SCS,
-    pop_size=35,
-    n_gen=10
+    pop_size=20,
+    n_gen=20
 ):
     df = process_dataframe(df)
 

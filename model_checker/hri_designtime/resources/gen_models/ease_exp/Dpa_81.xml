@@ -224,13 +224,13 @@ int patterns_alt2[H] = {0,1,1,1,0};
 //
 
 // -&gt; DEFINE STARTING LOCATIONS IN CARTESIAN PLAN
-double startX[H] = {3480.35791091157,3573.391910714316,1400.0,400.0,500.0};
-double startY[H] = {398.66705837088534,707.6121901532265,200.0,200.0,200.0};
+double startX[H] = {526.6569525522397,364.3801790076372,1400.0,400.0,500.0};
+double startY[H] = {208.77534107098543,368.90492901443815,200.0,200.0,200.0};
 
-double startX_alt1[H] = {3480.35791091157,3573.391910714316,1400.0,400.0,500.0};
-double startY_alt1[H] = {398.66705837088534,707.6121901532265,200.0,200.0,200.0};
-double startX_alt2[H] = {3480.35791091157,3573.391910714316,1400.0,400.0,500.0};
-double startY_alt2[H] = {398.66705837088534,707.6121901532265,200.0,200.0,200.0};
+double startX_alt1[H] = {526.6569525522397,364.3801790076372,1400.0,400.0,500.0};
+double startY_alt1[H] = {208.77534107098543,368.90492901443815,200.0,200.0,200.0};
+double startX_alt2[H] = {526.6569525522397,364.3801790076372,1400.0,400.0,500.0};
+double startY_alt2[H] = {208.77534107098543,368.90492901443815,200.0,200.0,200.0};
 
 // -&gt; DEFINE DESTINATIONS IN CARTESIAN PLAN
 // the definition of destination can vary depending on the pattern,
@@ -5079,8 +5079,8 @@ clock t_act;
 
 //Human-Robot Distance Parameters
 const double safetyDistance = 2.0;
-const double stopDistance = 6.00;
-const double restartDistance = 3.52;
+const double stopDistance = 7.55;
+const double restartDistance = 3.63;
 int recipientStages = 0;
 
 //Recharging Policy Parameters
@@ -5090,8 +5090,8 @@ const double failBattery = 11.0;
 
 //Fatigue-Monitoring Parameters
 const double failFatigue = 0.97;
-const double stopFatigue = 0.61;
-const double resumeFatigue = 0.39;
+const double stopFatigue = 0.46;
+const double resumeFatigue = -0.10;
 
 
 /**
@@ -5708,8 +5708,8 @@ void publish() {
 </template>
 	<system>
 // Robot Instances
-r_1 = Robot(1, 47.106571061368236, 47.106571061368236, 2500.00, 510.00);
-b_r_1 = Battery(1, 12.089439268699191);
+r_1 = Robot(1, 94.13240947599783, 94.13240947599783, 2500.00, 510.00);
+b_r_1 = Battery(1, 11.982883263034227);
 r_pub_1 = ROS_SensPub(1, 0.0, 0.00);
 c_pub = ROS_SensPub(0, 0.5, 0.01);
 
@@ -5727,11 +5727,11 @@ opchk_1 = OpChk(1, 1, 0);
 
 // Human Instances
 // -&gt; DEFINE HUMAN PATTERNS
-h_1 = Human_Follower(1, 44.000590380684486, 4, 7, -1, -1);
-h_2 = Human_Leader(2, 60.45819075755496, 5, 8, -1, -1);
-h_3 = Human_Leader(3, 60.45819075755496, 5, 8, 2, -1);
-h_4 = Human_Leader(4, 44.000590380684486, 4, 7, 1, -1);
-h_5 = Human_Follower(5, 44.000590380684486, 4, 7, 1, -1);
+h_1 = Human_Follower(1, 81.23370361982728, 5, 7, -1, -1);
+h_2 = Human_Leader(2, 74.0548724344125, 2, 8, -1, -1);
+h_3 = Human_Leader(3, 74.0548724344125, 2, 8, 2, -1);
+h_4 = Human_Leader(4, 81.23370361982728, 5, 7, 1, -1);
+h_5 = Human_Follower(5, 81.23370361982728, 5, 7, 1, -1);
 h_pub_pos = ROS_SensPub(2, 0.5, 0.01);
 h_pub_ftg = ROS_SensPub(3, 0.5, 0.01);
 
