@@ -65,7 +65,6 @@ def visualize_comparison_box(df_invalid: pd.DataFrame, r_points: int, s_points: 
     plt.tight_layout()
     os.makedirs(f"visualization/figs/figs_{test_name}", exist_ok=True)
     plt.savefig(f"visualization/figs/figs_{test_name}/combined_box_r{r_points}_s{s_points}.png", dpi=300)
-    plt.show()
 
 def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame, test_name: str):
     """Plot epsilon vs. resampling points separately for each validation type."""
@@ -107,3 +106,47 @@ def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame, test_name: st
         filename = f"epsilon_trend_{v_type.replace(' ', '_').lower()}"
         os.makedirs(f"visualization/figs/figs_{test_name}", exist_ok=True)
         plt.savefig(f"visualization/figs/figs_{test_name}/{filename}.png", dpi=300)
+
+def plot_mean_epsilon_per_method(df_combined: pd.DataFrame, test_name: str):
+    """
+    For each unique number of regressor points, plot how the mean epsilon
+    changes per oversampling method over the number of resampling points.
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import os
+
+    os.makedirs(f"visualization/figs/figs_{test_name}", exist_ok=True)
+
+    regressor_values = sorted(df_combined['Regressor Points'].unique())
+
+    for r_point in regressor_values:
+        df_subset = df_combined[df_combined['Regressor Points'] == r_point]
+
+        # Compute mean epsilon for each (Method, Resampling Points) pair
+        mean_eps = (
+            df_subset
+            .groupby(['Method', 'Resampling Points'])['Epsilons']
+            .mean()
+            .reset_index()
+        )
+
+        plt.figure(figsize=(10, 6))
+        sns.lineplot(
+            data=mean_eps,
+            x='Resampling Points',
+            y='Epsilons',
+            hue='Method',
+            marker='o'
+        )
+
+        plt.title(f"Mean Epsilon per Method — Regressor Points: {r_point}", fontsize=14)
+        plt.xlabel("Resampling Points", fontsize=12)
+        plt.ylabel("Mean Epsilon", fontsize=12)
+        plt.grid(True, linestyle=':', alpha=0.7)
+        plt.legend(title='Method')
+        plt.tight_layout()
+
+        save_path = f"visualization/figs/figs_{test_name}/mean_epsilon_r{r_point}.png"
+        plt.savefig(save_path, dpi=300)
+        plt.close()

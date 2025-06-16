@@ -52,7 +52,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
 
 def mono_test_pipeline():
     regressor_points = [1000]
-    resampling_points = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    resampling_points = [1, 2, 5, 7, 10, 15, 20]
 
     if len(sys.argv) < 2:
        logger.error("Please, insert the test name as an argument. It is used to save the results.")
@@ -63,18 +63,14 @@ def mono_test_pipeline():
        logger.error("Invalid test name, please use the suggested format")
        return
     
-    # Perform oversmapling pipeline:
+    # Perform oversampling pipeline:
     invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs", test_name=test_name)
     df_invalid = process_results(invalid_stats)
-    
     df_invalid['Validation Type'] = 'Invalid Configs'
 
-    for r in regressor_points:
-        for s in resampling_points:
-            # Filter the DataFrames for the current combination of regressor and resampling points
-            df_i = df_invalid[(df_invalid['Regressor Points'] == r) & (df_invalid['Resampling Points'] == s)]
-            # Check if both DataFrames are not empty before plotting
-            visualize_comparison_box(df_i, r_points=r, s_points=s, test_name=test_name)
+    plot_mean_epsilon_per_method(df_invalid, test_name=test_name)
+
+    print(df_invalid[['Method', 'Regressor Points', 'Resampling Points', 'Epsilons']].head())
 
 if __name__ == "__main__":
     from multiprocessing import freeze_support

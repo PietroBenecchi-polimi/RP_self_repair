@@ -91,15 +91,14 @@ class Pipeline:
 
         regressor_copy = clone(self.regressor)
         regressor_copy.fit(X, y)
-        self.regressor = regressor_copy
         
-        return self.regressor
+        return regressor_copy
 
-    def generate_neighbours_from_config(self, config: pd.DataFrame, neighbours_to_generate=20, offset=0.025):
+    def generate_neighbours_from_config(self, config: pd.DataFrame, neighbours_to_generate=20, offset=0.025, regressor = None):
         with open('data/hmtfactor_config.json', 'r') as file:
             factors = dict(json.load(file))
         neighbours = pd.DataFrame()
-
+        regressor = regressor if regressor is not None else self.regressor
         transformation_rules = get_transformation_rules()
 
         # If target_config is a DataFrame with one row, convert to Series for easier access

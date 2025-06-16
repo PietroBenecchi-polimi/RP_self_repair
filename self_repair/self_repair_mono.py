@@ -19,7 +19,7 @@ with open('data/hmtfactor_config.json', 'r') as file:
 # 1. It retrains the regressor with new samples (with ground truth data)
 # 2. It optimizes the configurations using the retrained regressor
 # 3. It validates the optimized configurations against the ground truth
-def oversample_retraing_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeline, test_dataset, oversampling_method_name: str, new_samples: pd.DataFrame):
+def oversample_retraing_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeline, target_original, oversampling_method_name: str, new_samples: pd.DataFrame):
     new_samples = new_samples.drop(columns=["SCS"]) if "SCS" in new_samples.columns else new_samples
 
     new_samples_results = interface.mc_results_from_configs(new_samples)
@@ -27,14 +27,15 @@ def oversample_retraing_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeli
     new_regressor = pipeline.retrain_regressor(new_samples_results)
 
     # optimization + validation
-    new_opt_configs_results = interface.opt_optimization(test_dataset, new_regressor, f"{oversampling_method_name}_{len(new_samples)}")
+    new_opt_configs_results = interface.opt_optimization(target_original, new_regressor, f"{oversampling_method_name}_{len(new_samples)}")
     # get ground truth
     new_groundtruth = interface.mc_results_from_configs(new_opt_configs_results.drop(columns=["SCS"]))
     _, epsilon_array = pipeline.validate_configurations(new_opt_configs_results, new_groundtruth)
 
-    new_data = pipeline.generate_neighbours_from_config(test_dataset.iloc[[0]].drop(columns=["SCS"]), neighbours_to_generate = 20)
-    new_data_SCS = interface.mc_results_from_configs(new_data.drop(columns=["SCS"]))
-    _, neighbours_array = pipeline.validate_configurations(new_data, new_data_SCS)
+    target_neighbours = pipeline.generate_neighbours_from_config(target_original.drop(columns=["SCS"]), neighbours_to_generate = 20)
+    target_neighbours_opt = interface.opt_optimization(target_neighbours, new_regressor, f"{oversampling_method_name}_neighbours")
+    new_data_SCS = interface.mc_results_from_configs(target_neighbours_opt.drop(columns=["SCS"]))
+    _, neighbours_array = pipeline.validate_configurations(target_neighbours_opt, new_data_SCS)
 
     return Stat(oversampling_method_name, epsilon_array), Stat(f"{oversampling_method_name}_neighbours", neighbours_array)
 
@@ -52,34 +53,36 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     opt_configs = mc_opt_interface.opt_optimization(p.test_set, p.regressor, f"regressor_{points_regressor}")
     ground_truth_first_test = mc_opt_interface.mc_results_from_configs(opt_configs.drop(columns=["SCS"]))
     invalid_configs, epsilon_array = p.validate_configurations(opt_configs, ground_truth_first_test)
-    
+    target = invalid_configs.iloc[[0]]
+    epsilon_target = epsilon_array[0]
+    target_original_value = p.test_set.iloc[[target.index[0]]]
     # contains <method_name, generated_data> without SCS column
-    generated_data_methods = p.oversample(n_samples, invalid_configs.iloc[[0]])
+    oversampling = p.oversample(n_samples, target)
 
-    new_data = p.generate_neighbours_from_config(invalid_configs.iloc[[0]].drop(columns=["SCS"]), neighbours_to_generate = 20)
-    new_data_SCS = mc_opt_interface.mc_results_from_configs(new_data.drop(columns=["SCS"]))
-    _, neighbours_array = p.validate_configurations(new_data, new_data_SCS)
+    target_neighbours = p.generate_neighbours_from_config(target.drop(columns=["SCS"]), neighbours_to_generate = 20)
+    new_data_SCS = mc_opt_interface.mc_results_from_configs(target_neighbours.drop(columns=["SCS"]))
+    _, neighbours_array = p.validate_configurations(target_neighbours, new_data_SCS)
 
     # Just add the first validation stats
     initial_stats = [
-        Stat("target", [epsilon_array[0]]),  # Stats requires list, not a single float/value
+        Stat("target", [epsilon_target]),  # Stats requires list, not a single float/value
         Stat(f"target-{len(neighbours_array)}-neighbours", neighbours_array)
     ]
 
     args = [
         (
-            mc_opt_interface,  # interface
+            mc_opt_interface,
             p,
-            p.test_set.iloc[[0]], # gives a single row DataFrame, not Dataseries
+            target_original_value,
             method,
-            generated_data_methods[method]
-        ) for method in generated_data_methods.keys()
+            oversampling[method]
+        ) for method in oversampling.keys()
     ]
 
     logger.debug("Starting the oversampling and validation process")
     start_time = time.time()
 
-    with multiprocessing.Pool(processes=1) as pool:
+    with multiprocessing.Pool(processes=len(oversampling.keys())) as pool:
         parallel_stats = pool.starmap(oversample_retraing_validation, args)
 
     end_time = time.time()
