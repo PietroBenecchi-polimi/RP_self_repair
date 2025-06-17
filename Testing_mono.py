@@ -36,7 +36,6 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
                 n_samples=s_points,
                 data_type_second_validation=second_test_data_str,
                 points_regressor=r_points,
-                skip_cache=True,
             )
 
             stats_per_points.append(
@@ -51,8 +50,8 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
     return stats_per_points
 
 def mono_test_pipeline():
-    regressor_points = [700]
-    resampling_points = [1, 2, 5, 7, 10, 15, 20]
+    regressor_points = [950]
+    resampling_points = [20]
 
     if len(sys.argv) < 2:
        logger.error("Please, insert the test name as an argument. It is used to save the results.")

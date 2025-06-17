@@ -1,13 +1,19 @@
 import os
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import set_loglevel
 import seaborn as sns
 from PIL.PngImagePlugin import logger as pil_logger
 from typing import List, Dict
 from self_repair.stats import Stat
 from utils.rp_logger import logger
-plt.set_loglevel("Warning")
+import logging
+import matplotlib.pyplot as plt
+from matplotlib import set_loglevel
+set_loglevel("WARNING")
+
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger('matplotlib.font_manager').disabled = True
 pil_logger.disabled = True
 
 def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:

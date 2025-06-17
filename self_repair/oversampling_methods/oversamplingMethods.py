@@ -138,6 +138,14 @@ class KDEOversampling(OversamplingMethod):
         new_samples = pd.DataFrame(feature_samples)
         self.setResampling(dc.castIntegerFeatures(new_samples))
 
+class PlugInvalid(OversamplingMethod):
+    def __init__(self):
+        super().__init__()
+        self.name_id = "PlugInvalid"
+    def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
+        df = df.drop(columns=["SCS"], errors='ignore')
+        self.setResampling(dc.castIntegerFeatures(df))
+
 class SmoteBasedOversampling(OversamplingMethod):
     def __init__(self, unbalanced_dataset: pd.DataFrame = pd.DataFrame()):
         super().__init__()

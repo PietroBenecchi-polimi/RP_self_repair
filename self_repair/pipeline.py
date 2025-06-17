@@ -59,7 +59,8 @@ class Pipeline:
         methods = [
             RandomOversampling,
             LimeBasedOversampling,
-            KDEOversampling
+            KDEOversampling,
+            PlugInvalid
         ]
 
         results_dict = {}
@@ -67,10 +68,13 @@ class Pipeline:
         def run_method(cls: OversamplingMethod):
             if cls == LimeBasedOversampling:
                 instance: OversamplingMethod = cls(self.regressor)
-                instance.run_oversampling(df=self.test_set.copy(), n_samples=n_samples)
+                instance.run_oversampling(df=invalid_configurations, n_samples=n_samples)
             elif issubclass(cls, SmoteBasedOversampling):
                 instance: SmoteBasedOversampling = cls(invalid_configurations)
-                instance.run_oversampling(df=self.test_set, n_samples=n_samples)
+                instance.run_oversampling(n_samples=n_samples)
+            elif issubclass(cls, PlugInvalid):
+                instance: PlugInvalid = cls()
+                instance.run_oversampling(df=invalid_configurations, n_samples=n_samples)
             else:
                 instance: OversamplingMethod = cls()
                 instance.run_oversampling(df=self.test_set.copy(), n_samples=n_samples)
