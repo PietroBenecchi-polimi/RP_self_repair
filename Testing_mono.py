@@ -27,7 +27,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
 
     for r_points in regressor_points:
         for s_points in resampling_points:
-            logger.info(f"\nRunning experiment with regressor_points={r_points}, resampling_points={s_points}")
+            logger.info(f"Running experiment with regressor_points={r_points}, resampling_points={s_points}")
             if (r_points, s_points) in existing_combinations:
                 logger.warning(f"Skipping already processed combination: regressor={r_points}, resampling={s_points}")
                 continue
@@ -51,7 +51,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
     return stats_per_points
 
 def mono_test_pipeline():
-    regressor_points = [1000]
+    regressor_points = [700]
     resampling_points = [1, 2, 5, 7, 10, 15, 20]
 
     if len(sys.argv) < 2:
@@ -68,10 +68,8 @@ def mono_test_pipeline():
     df_invalid = process_results(invalid_stats)
     df_invalid['Validation Type'] = 'Invalid Configs'
 
-    plot_mean_epsilon_per_method(df_invalid, test_name=test_name)
-
-    print(df_invalid[['Method', 'Regressor Points', 'Resampling Points', 'Epsilons']].head())
-
+    plot_variance_epsilon_per_method(df_invalid, test_name=test_name)
+    visualize_comparison_box(df_invalid, test_name=test_name)
 if __name__ == "__main__":
     from multiprocessing import freeze_support
     freeze_support()

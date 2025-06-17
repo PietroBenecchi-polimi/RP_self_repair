@@ -3,10 +3,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from PIL.PngImagePlugin import logger as pil_logger
 from typing import List, Dict
-from matplotlib import cm
 from self_repair.stats import Stat
-plt.set_loglevel("warning")
+from utils.rp_logger import logger
+plt.set_loglevel("Warning")
+pil_logger.disabled = True
 
 def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
     """Flatten the list of stats into a DataFrame suitable for boxplotting."""
@@ -30,100 +32,72 @@ def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def visualize_comparison_box(df_invalid: pd.DataFrame, r_points: int, s_points: int, test_name: str, df_standard: pd.DataFrame = pd.DataFrame([])) -> None:
-    """Create a box plot showing both validation types for a specific configuration."""
-    df_invalid = df_invalid.copy()
-    df_standard = df_standard.copy()
-
-    # Combine the dataframes for the two validation types
-    combined_df = pd.concat([df_invalid, df_standard])
-
-    plt.figure(figsize=(12, 6))
-
-    # Create a box plot with the 'Method' on the x-axis, 'Epsilons' on the y-axis, 
-    # and 'Validation Type' as the hue for color differentiation.
-    ax = sns.boxplot(data=combined_df, x='Method', y='Epsilons', hue='Validation Type',
-                     palette='muted', fliersize=5, linewidth=2)
-
-    # Add mean lines per method and validation type
-    for method in combined_df['Method'].unique():
-        for val_type in ['Invalid Configs', 'Standard']:
-            mean_val = combined_df[(combined_df['Method'] == method) & 
-                                   (combined_df['Validation Type'] == val_type)]['Epsilons'].mean()
-            xpos = list(combined_df['Method'].unique()).index(method)
-            offset = -0.2 if val_type == 'Invalid Configs' else 0.2
-            ax.plot([xpos + offset - 0.05, xpos + offset + 0.05],
-                    [mean_val, mean_val],
-                    color='red', linewidth=2)
-
-    plt.title(f"Validation Comparison — Regressor: {r_points}, Resampling: {s_points}", fontsize=14)
-    plt.xlabel("Oversampling Method", fontsize=12)
-    plt.ylabel("Epsilons", fontsize=12)
-    plt.xticks(rotation=45)
-    plt.grid(True, axis='y', linestyle=':', alpha=0.7)
-    plt.legend(title='Validation Type')
-    plt.tight_layout()
+def visualize_comparison_box(df_combined: pd.DataFrame, test_name: str) -> None:
+    """Create a box plot for each unique (regressor, resampling) configuration."""
     os.makedirs(f"visualization/figs/figs_{test_name}", exist_ok=True)
-    plt.savefig(f"visualization/figs/figs_{test_name}/combined_box_r{r_points}_s{s_points}.png", dpi=300)
 
-def plot_epsilon_over_resampling_points(df_combined: pd.DataFrame, test_name: str):
-    """Plot epsilon vs. resampling points separately for each validation type."""
-    validation_types = df_combined['Validation Type'].unique()
+    configs = df_combined[['Regressor Points', 'Resampling Points']].drop_duplicates()
+    total = len(configs)
+    logger.info(f"Generating {total} box plots...")
 
-    for v_type in validation_types:
-        df_subset = df_combined[df_combined['Validation Type'] == v_type]
-        regressor_points = sorted(df_subset['Regressor Points'].unique())
+    for idx, (_, row) in enumerate(configs.iterrows(), start=1):
+        r_points = row['Regressor Points']
+        s_points = row['Resampling Points']
 
-        n_rows = int(np.ceil(len(regressor_points) / 2))
-        fig, axes = plt.subplots(n_rows, 2, figsize=(14, 5 * n_rows), sharey=True)
-        axes = axes.flatten()
+        df_subset = df_combined[
+            (df_combined['Regressor Points'] == r_points) &
+            (df_combined['Resampling Points'] == s_points)
+        ]
 
-        for idx, r_point in enumerate(regressor_points):
-            ax = axes[idx]
-            subset = df_subset[df_subset['Regressor Points'] == r_point]
+        plt.figure(figsize=(12, 6))
+        ax = sns.boxplot(
+            data=df_subset,
+            x='Method',
+            y='Epsilons',
+            hue='Validation Type',
+            palette='muted',
+            fliersize=5,
+            linewidth=2
+        )
 
-            sns.lineplot(
-                data=subset,
-                x='Resampling Points',
-                y='Epsilons',
-                hue='Method',
-                markers=True,
-                dashes=False,
-                ax=ax
-            )
+        # Add mean lines
+        for method in df_subset['Method'].unique():
+            for val_type in df_subset['Validation Type'].unique():
+                mean_val = df_subset[
+                    (df_subset['Method'] == method) & 
+                    (df_subset['Validation Type'] == val_type)
+                ]['Epsilons'].mean()
+                xpos = list(df_subset['Method'].unique()).index(method)
+                offset = -0.2 if val_type == 'Invalid Configs' else 0.2
+                ax.plot([xpos + offset - 0.05, xpos + offset + 0.05],
+                        [mean_val, mean_val], color='red', linewidth=2)
 
-            ax.set_title(f"{v_type} - Regressor Points: {r_point}", fontsize=13)
-            ax.set_xlabel("Resampling Points")
-            ax.set_ylabel("Epsilons")
-            ax.grid(True, linestyle=':', alpha=0.7)
-            ax.legend(title='Method', bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.title(f"Validation Comparison — Regressor: {r_points}, Resampling: {s_points}")
+        plt.xlabel("Oversampling Method")
+        plt.ylabel("Epsilons")
+        plt.xticks(rotation=45)
+        plt.grid(True, axis='y', linestyle=':', alpha=0.7)
+        plt.legend(title='Validation Type')
+        plt.tight_layout()
 
-        for j in range(idx + 1, len(axes)):
-            fig.delaxes(axes[j])
+        save_path = f"visualization/figs/figs_{test_name}/combined_box_r{r_points}_s{s_points}.png"
+        plt.savefig(save_path, dpi=300)
+        plt.close()
 
-        plt.suptitle(f"Epsilons vs. Resampling Points ({v_type})", fontsize=16)
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        filename = f"epsilon_trend_{v_type.replace(' ', '_').lower()}"
-        os.makedirs(f"visualization/figs/figs_{test_name}", exist_ok=True)
-        plt.savefig(f"visualization/figs/figs_{test_name}/{filename}.png", dpi=300)
+        logger.info(f"[{idx}/{total}] Saved box plot: {save_path}")
+
 
 def plot_mean_epsilon_per_method(df_combined: pd.DataFrame, test_name: str):
-    """
-    For each unique number of regressor points, plot how the mean epsilon
-    changes per oversampling method over the number of resampling points.
-    """
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    import os
-
+    """Plot mean epsilon per method for each regressor point."""
     os.makedirs(f"visualization/figs/figs_{test_name}", exist_ok=True)
 
     regressor_values = sorted(df_combined['Regressor Points'].unique())
+    total = len(regressor_values)
+    logger.info(f"Generating {total} mean epsilon plots...")
 
-    for r_point in regressor_values:
+    for idx, r_point in enumerate(regressor_values, start=1):
         df_subset = df_combined[df_combined['Regressor Points'] == r_point]
 
-        # Compute mean epsilon for each (Method, Resampling Points) pair
         mean_eps = (
             df_subset
             .groupby(['Method', 'Resampling Points'])['Epsilons']
@@ -140,9 +114,9 @@ def plot_mean_epsilon_per_method(df_combined: pd.DataFrame, test_name: str):
             marker='o'
         )
 
-        plt.title(f"Mean Epsilon per Method — Regressor Points: {r_point}", fontsize=14)
-        plt.xlabel("Resampling Points", fontsize=12)
-        plt.ylabel("Mean Epsilon", fontsize=12)
+        plt.title(f"Mean Epsilon per Method — Regressor Points: {r_point}")
+        plt.xlabel("Resampling Points")
+        plt.ylabel("Mean Epsilon")
         plt.grid(True, linestyle=':', alpha=0.7)
         plt.legend(title='Method')
         plt.tight_layout()
@@ -150,3 +124,48 @@ def plot_mean_epsilon_per_method(df_combined: pd.DataFrame, test_name: str):
         save_path = f"visualization/figs/figs_{test_name}/mean_epsilon_r{r_point}.png"
         plt.savefig(save_path, dpi=300)
         plt.close()
+
+        logger.info(f"[{idx}/{total}] Saved mean epsilon plot: {save_path}")
+
+
+def plot_variance_epsilon_per_method(df_combined: pd.DataFrame, test_name: str):
+    """Plot epsilon variance per method for each regressor point."""
+    os.makedirs(f"visualization/figs/figs_{test_name}", exist_ok=True)
+
+    regressor_values = sorted(df_combined['Regressor Points'].unique())
+    total = len(regressor_values)
+    logger.info(f"Generating {total} epsilon variance plots...")
+
+    for idx, r_point in enumerate(regressor_values, start=1):
+        df_subset = df_combined[df_combined['Regressor Points'] == r_point]
+
+        grouped = (
+            df_subset
+            .groupby(['Method', 'Resampling Points'], as_index=False)['Epsilons']
+            .var()
+            .rename(columns={'Epsilons': 'Epsilon Variance'})
+        )
+
+        plt.figure(figsize=(10, 6))
+        sns.lineplot(
+            data=grouped,
+            x='Resampling Points',
+            y='Epsilon Variance',
+            hue='Method',
+            marker='o',
+            linewidth=2
+        )
+
+        plt.title(f"Epsilon Variance vs Resampling Points — Regressor Points: {r_point}")
+        plt.xlabel("Resampling Points")
+        plt.ylabel("Epsilon Variance")
+        plt.xticks(sorted(df_subset['Resampling Points'].unique()))
+        plt.grid(True, linestyle=':', alpha=0.7)
+        plt.legend(title='Method', loc='best')
+        plt.tight_layout()
+
+        save_path = f"visualization/figs/figs_{test_name}/variance_epsilon_r{r_point}.png"
+        plt.savefig(save_path, dpi=300)
+        plt.close()
+
+        logger.info(f"[{idx}/{total}] Saved variance epsilon plot: {save_path}")
