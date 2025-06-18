@@ -95,6 +95,7 @@ class LimeBasedOversampling(OversamplingMethod):
                     probabilities = np.exp(-0.5 * ((values - mean) / variance) ** 2)
                     probabilities /= probabilities.sum()
                     new_value = np.random.choice(values, p=probabilities)
+                    new_value = df[feature]
                 else:
                     if feature == "PRGS":
                         values = np.array([0, 1, 2, 3, 4, 5])
@@ -125,15 +126,35 @@ class KDEOversampling(OversamplingMethod):
     def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
         df = df.drop(columns=["SCS"], errors='ignore')
         feature_samples = {}
+        n_candidates = 10000
 
         for feature in df.columns:
             if feature not in self.transformation_rules:
+                data = df[[feature]].values
+
+                # Fit KDE
                 kde = KernelDensity(kernel='gaussian', bandwidth=0.2)
-                kde.fit(df[[feature]])
-                feature_samples[feature] = kde.sample(n_samples).flatten()
+                kde.fit(data)
+
+                # Define candidate range
+                min_val, max_val = data.min(), data.max()
+                candidates = np.linspace(min_val, max_val, n_candidates).reshape(-1, 1)
+
+                # Evaluate density
+                log_dens = kde.score_samples(candidates)
+                density = np.exp(log_dens)
+
+                # Avoid division by zero and normalize inverse density
+                inv_density = 1 / (density + 1e-10)
+                inv_density /= inv_density.sum()
+
+                # Sample from inverse density
+                rng = np.random.default_rng(seed=128)
+                sampled_indices = rng.choice(n_candidates, size=n_samples, p=inv_density)
+                sampled_points = candidates[sampled_indices].flatten()
+                feature_samples[feature] = sampled_points
             else:
-                values = np.array(list(self.transformation_rules[feature].values()), dtype=float)
-                feature_samples[feature] = np.random.choice(values, n_samples)
+                feature_samples[feature] = df[feature].sample(n=n_samples, replace=True).values
 
         new_samples = pd.DataFrame(feature_samples)
         self.setResampling(dc.castIntegerFeatures(new_samples))
@@ -142,7 +163,7 @@ class PlugInvalid(OversamplingMethod):
     def __init__(self):
         super().__init__()
         self.name_id = "PlugInvalid"
-    def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
+    def run_oversampling(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.drop(columns=["SCS"], errors='ignore')
         self.setResampling(dc.castIntegerFeatures(df))
 
