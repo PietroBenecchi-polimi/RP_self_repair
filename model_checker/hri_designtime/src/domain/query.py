@@ -61,7 +61,7 @@ class Query:
                 q = ''
                 for (i, h) in enumerate(self.hums):
                     if h.path != 2:
-                        q += "E[<={};1000](max:humanFatigue[{}])\n".format(self.tau, i)
+                        q += "E[<={}; 1000](max:humanFatigue[{}])\n".format(self.tau, i)
                 return q
         elif self.t == Query_Type.E_CHG:
             if self.n != ND:

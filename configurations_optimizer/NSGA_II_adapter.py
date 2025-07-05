@@ -145,7 +145,7 @@ def optimize_configurations(
             "Iteration_duration": iteration_duration,
             "PSCS__TAU": df.loc[idx, "PSCS__TAU"]
         })
-
+    print(df.head())
     result_df = pd.DataFrame(results, columns=result_df_columns)
 
     return result_df

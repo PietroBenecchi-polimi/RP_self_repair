@@ -8,7 +8,7 @@ from imblearn.over_sampling import SMOTE, ADASYN, BorderlineSMOTE
 from self_repair.oversampling_methods.LIME import explain_prediction_with_lime
 from utils.datacleaner import get_transformation_rules
 import utils.datacleaner as dc
-
+from utils.rp_logger import logger
 with open('data/hmtfactor_config.json', 'r') as file:
     factors = dict(json.load(file))
 
@@ -86,17 +86,13 @@ class LimeBasedOversampling(OversamplingMethod):
             new_sample = df.loc[[index]].copy()
 
             for feature in new_sample.columns:
-                mean = float(new_sample[feature].values[0])
-                importance = explanations.loc[index].get(feature, 0.0)
-                variance = np.clip(abs(1.0 / (importance + epsilon)), 0.01, 1.0)
 
                 if feature in self.transformation_rules:
-                    values = np.array(list(self.transformation_rules[feature].values()), dtype=float)
-                    probabilities = np.exp(-0.5 * ((values - mean) / variance) ** 2)
-                    probabilities /= probabilities.sum()
-                    new_value = np.random.choice(values, p=probabilities)
-                    new_value = df[feature]
+                    continue
                 else:
+                    mean = float(new_sample[feature].values[0])
+                    importance = explanations.loc[index].get(feature, 0.0)
+                    variance = np.clip(abs(1.0 / (importance + epsilon)), 0.01, 1.0)
                     if feature == "PRGS":
                         values = np.array([0, 1, 2, 3, 4, 5])
                         probabilities = np.exp(-0.5 * ((values - mean) / variance) ** 2)
@@ -105,13 +101,7 @@ class LimeBasedOversampling(OversamplingMethod):
                     elif feature == "PSCS__TAU":
                         new_value = np.random.choice(np.arange(250, 751))
                     else:
-                        if feature in ["HUM_1_POS_X", "HUM_2_POS_X"]:
-                            col_max, col_min = factors["HUM_1_POS"]["max_x"], factors["HUM_1_POS"]["min_x"]
-                        elif feature in ["HUM_1_POS_Y", "HUM_2_POS_Y"]:
-                            col_max, col_min = factors["HUM_1_POS"]["max_y"], factors["HUM_1_POS"]["min_y"]
-                        else:
-                            col_max, col_min = factors[feature]["max"], factors[feature]["min"]
-                        new_value = np.random.uniform(col_min, col_max)
+                        new_value = np.random.normal(mean, variance)
 
                 new_sample[feature] = new_value
             new_samples.append(new_sample)
@@ -160,9 +150,11 @@ class KDEOversampling(OversamplingMethod):
         self.setResampling(dc.castIntegerFeatures(new_samples))
 
 class PlugInvalid(OversamplingMethod):
+
     def __init__(self):
         super().__init__()
         self.name_id = "PlugInvalid"
+        
     def run_oversampling(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.drop(columns=["SCS"], errors='ignore')
         self.setResampling(dc.castIntegerFeatures(df))

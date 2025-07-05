@@ -5,6 +5,8 @@ import pickle
 from typing import List, Dict
 from visualization.visualization import *
 from utils.rp_logger import logger
+import math
+import utils.datacleaner as dc
 
 def save_results(stats_per_points: List[Dict], save_path: str) -> None:
     """Save results to a Pickle file."""
@@ -31,11 +33,13 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
             if (r_points, s_points) in existing_combinations:
                 logger.warning(f"Skipping already processed combination: regressor={r_points}, resampling={s_points}")
                 continue
+            
             stats = run_oversampling_pipeline(
-                n_data_to_verify=15,
+                n_data_to_verify=300,
                 n_samples=s_points,
                 data_type_second_validation=second_test_data_str,
                 points_regressor=r_points,
+                max_iterations=50
             )
 
             stats_per_points.append(
@@ -50,8 +54,8 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
     return stats_per_points
 
 def mono_test_pipeline():
-    regressor_points = [300]
-    resampling_points = [1, 2, 4, 8, 10, 15, 20, 30, 50]
+    regressor_points = [1000]
+    resampling_points = [20] 
 
     if len(sys.argv) < 2:
        logger.error("Please, insert the test name as an argument. It is used to save the results.")
@@ -64,13 +68,13 @@ def mono_test_pipeline():
     
     # Perform oversampling pipeline:
     invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs", test_name=test_name)
-    df_invalid = process_results(invalid_stats)
+    df_invalid = dc.process_results(invalid_stats)
     df_invalid['Validation Type'] = 'Invalid Configs'
-
-    plot_variance_epsilon_per_method(df_invalid, test_name=test_name)
-    visualize_comparison_box(df_invalid, test_name=test_name)
+    
+    # plot_single_config_oversampling(invalid_stats, test_name=test_name)
+    plot_allConfigs_boxplot(df_invalid, test_name=test_name)
     plot_mean_epsilon_per_method(df_invalid, test_name=test_name)
+    
 if __name__ == "__main__":
-    from multiprocessing import freeze_support
-    freeze_support()
     mono_test_pipeline()
+    

@@ -1,4 +1,6 @@
 import pandas as pd
+from typing import List, Dict
+from self_repair.stats import Stat
 
 # Transformation rules
 transform_rules = {
@@ -127,3 +129,33 @@ def castIntegerFeatures(data):
         if feature in ["PSCS__TAU", "PRGS"]:
             data[feature] = data[feature].astype(int)
     return data
+
+def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
+    """Flatten the list of stats into a DataFrame suitable for boxplotting."""
+    data = []
+
+    for experiment in stats_per_points:
+        r_points = experiment['regressor_points']
+        s_points = experiment['resampling_points']
+        stats: list[Stat] = experiment['stats']
+
+        for stat in stats:
+            method = stat.get_method_name()
+            epsilon_points = stat.get_epsilon_points()
+            if(isinstance(epsilon_points, list)):
+                for eps in stat.get_epsilon_points():
+                    data.append({
+                        'Method': method,
+                        'Regressor Points': r_points,
+                        'Resampling Points': s_points,
+                        'Epsilons': eps
+                    })
+            elif(isinstance(epsilon_points, Dict)):
+                for eps in epsilon_points.values():
+                    data.append({
+                        'Method': method,
+                        'Regressor Points': r_points,
+                        'Resampling Points': s_points,
+                        'Epsilons': eps
+                    })
+    return pd.DataFrame(data)

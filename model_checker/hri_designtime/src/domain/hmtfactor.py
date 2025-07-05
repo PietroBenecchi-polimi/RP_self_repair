@@ -23,7 +23,7 @@ class HMTFactor:
         if self.hmt_type == 'float':
             self.value = float(s)
         elif self.hmt_type == 'int':
-            self.value = int(s)
+            self.value = int(float(s))
         elif self.hmt_type == 'str':
             self.value = s
         elif self.hmt_type == 'FreeWillProfile':
