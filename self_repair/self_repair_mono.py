@@ -43,14 +43,16 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
         n_data_to_verify=n_data_to_verify
     )
 
-    mc_opt_interface = mc.RegressorInterface(p.ground_truth_regressor)
+    mc_opt_interface = mc.ModelCheckerInterface()
 
     opt_configs = mc_opt_interface.opt_optimization(p.test_set, p.regressor).reset_index(drop=True)
     ground_truth_first_test = mc_opt_interface.mc_results_from_configs(opt_configs.drop(columns=["SCS"]))
     invalid_configs, epsilon_array = p.validate_configurations(opt_configs, ground_truth_first_test)
 
     all_stats = []
+
     logger.debug(f"Found {len(invalid_configs)} invalid configurations")
+
     # Ensure cache directory exists
     os.makedirs("cache", exist_ok=True)
 

@@ -80,7 +80,7 @@ def fromMCtoOptimizer(data) -> pd.DataFrame:
     mask = ~((data['PRSCS_LOWER_BOUND'] == 0) & (data['PRSCS_UPPER_BOUND'] == 0) & (data['FTG_HUM_1'] == 0) & (data['FTG_HUM_2'] == 0))
     data = data[mask]
 
-    data['SCS'] = data['PRSCS_LOWER_BOUND'] + data['PRSCS_UPPER_BOUND'] / 2
+    data['SCS'] = (data['PRSCS_LOWER_BOUND'] + data['PRSCS_UPPER_BOUND']) / 2
 
     # Split AGE/STAT columns back into original components
     data['HUM_1_FTG'] = data['HUM_1_FTG'].astype(str)
@@ -101,7 +101,7 @@ def fromMCtoOptimizer(data) -> pd.DataFrame:
     # drop combined columns
     data.drop(columns=['HUM_1_FTG', 'HUM_2_FTG', 'HUM_1_POS', 'HUM_2_POS'], inplace=True)
 
-    # Remove columns scs and ftg(should be changed if test on fatigue)
+    # Remove columns scs and ftg (should be changed if test on fatigue)
     data.drop(columns=['PRSCS_LOWER_BOUND', 'PRSCS_UPPER_BOUND', 'FTG_HUM_1', 'FTG_HUM_2'], inplace=True)
     
     # Extract new columns
