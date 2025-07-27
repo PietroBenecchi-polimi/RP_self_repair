@@ -55,7 +55,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
 
 def mono_test_pipeline():
     regressor_points = [1000]
-    resampling_points = [50] 
+    resampling_points = [100] 
 
     if len(sys.argv) < 2:
        logger.error("Please, insert the test name as an argument. It is used to save the results.")
