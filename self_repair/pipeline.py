@@ -5,6 +5,16 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from self_repair.oversampling_methods.oversamplingMethods import *
 from sklearn.base import clone
+import time
+import logging
+from concurrent.futures import ThreadPoolExecutor
+
+
+# Imposta il logging (puoi anche spostarlo a livello globale nel tuo script)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 class Pipeline:
     
@@ -52,10 +62,7 @@ class Pipeline:
         invalid_results_df = pd.DataFrame(invalid_results)
 
         return invalid_results_df, epsilon_array
-
-    ## Run all oversampling methods in parallel. Is it parallel? 
-    ## Output: dictionary <method_name, new_data>
-    ## IMPORTANT: data is generated without metrics(SCS, FTG)
+    
     def oversample(self, n_samples: int, invalid_configurations: pd.DataFrame):
         methods = [
             RandomOversampling,
@@ -67,6 +74,9 @@ class Pipeline:
         results_dict = {}
 
         def run_method(cls: OversamplingMethod):
+            start_time = time.perf_counter()
+            logging.info(f"🚀 Starting oversampling method: {cls.__name__}")
+
             if cls == LimeBasedOversampling:
                 instance: OversamplingMethod = cls(self.regressor)
                 instance.run_oversampling(df=invalid_configurations.copy(), n_samples=n_samples)
@@ -79,6 +89,10 @@ class Pipeline:
             else:
                 instance: OversamplingMethod = cls()
                 instance.run_oversampling(df=self.test_set.copy(), n_samples=n_samples)
+
+            elapsed = time.perf_counter() - start_time
+            logging.info(f"✅ Finished {cls.__name__} in {elapsed:.2f} seconds")
+
             return instance.name_id, instance.getResampling()
 
         with ThreadPoolExecutor() as executor:
@@ -87,7 +101,9 @@ class Pipeline:
                 name, resampled_df = future.result()
                 results_dict[name] = resampled_df
 
+        logging.info("🎯 All oversampling methods completed successfully.")
         return results_dict
+
     
     def retrain_regressor(self, oversampling: pd.DataFrame):
         combined_dataset = pd.concat([oversampling.copy(), self.train_data.copy()], ignore_index=True)

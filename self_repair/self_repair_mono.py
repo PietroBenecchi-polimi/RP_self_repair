@@ -32,7 +32,7 @@ def oversample_retraing_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeli
     new_data_SCS = interface.mc_results_from_configs(target_neighbours_opt.drop(columns=["SCS"]))
     _, neighbours_array = pipeline.validate_configurations(target_neighbours_opt, new_data_SCS)
 
-    return Stat(oversampling_method_name, epsilon_array), Stat(f"{oversampling_method_name}_neighbours", neighbours_array)
+    return Stat(oversampling_method_name, epsilon_array, target_neighbours_opt, new_data_SCS), Stat(f"{oversampling_method_name}_neighbours", neighbours_array, target_neighbours_opt, new_data_SCS)
 
 
 def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_validation: str, points_regressor, max_iterations=1):
@@ -83,8 +83,8 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
         neighbours_validation = mc_opt_interface.mc_results_from_configs(neighbours_optimized.drop(columns=["SCS"]))
         _, neighbours_array = p.validate_configurations(neighbours_optimized, neighbours_validation)
 
-        all_stats.append(Stat("target", [epsilon_target]))
-        all_stats.append(Stat(f"target-{len(neighbours_array)}-neighbours", neighbours_array))
+        all_stats.append(Stat("target", [epsilon_target], neighbours_optimized["SCS"].to_list(), neighbours_validation["SCS"].to_list()))
+        all_stats.append(Stat(f"target-{len(neighbours_array)}-neighbours", neighbours_array, neighbours_optimized["SCS"].to_list(), neighbours_validation["SCS"].to_list()))
 
         oversampling = p.oversample(n_samples, target_df)
 
