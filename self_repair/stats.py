@@ -9,7 +9,6 @@ class Stat:
         self.neighbours_optimized = neighbours_optimized
         self.neighbours_validation = neighbours_validation
 
-
     def __repr__(self):
         return (
             f"Stat(\n"
@@ -25,6 +24,12 @@ class Stat:
 
     def get_epsilon_points(self) -> List[float]:
         return self.epsilon_points
+    
+    def get_neighbours_optimized(self) -> List[float]:
+        return self.neighbours_optimized
+    
+    def get_neighbours_validation(self) -> List[float]:
+        return self.neighbours_validation
 
     def get_average_epsilon(self) -> float:
         if not self.epsilon_points:

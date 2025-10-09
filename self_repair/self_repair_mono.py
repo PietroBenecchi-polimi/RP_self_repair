@@ -4,15 +4,16 @@ import os
 import pandas as pd
 import multiprocessing
 import numpy as np
+
 import self_repair.mc_opt_interface as mc
+from self_repair.mc_opt_interface import MC_OPT_INTERFACE
+
 from self_repair.pipeline import Pipeline
 from self_repair.stats import Stat
-from self_repair.mc_opt_interface import MC_OPT_INTERFACE
 from utils.rp_logger import logger
 
 with open('data/hmtfactor_config.json', 'r') as file:
     factors = dict(json.load(file))
-
 
 # This function performs three main tasks:
 # 1. It retrains the regressor with new samples (with ground truth data)
@@ -32,7 +33,7 @@ def oversample_retraing_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeli
     new_data_SCS = interface.mc_results_from_configs(target_neighbours_opt.drop(columns=["SCS"]))
     _, neighbours_array = pipeline.validate_configurations(target_neighbours_opt, new_data_SCS)
 
-    return Stat(oversampling_method_name, epsilon_array, target_neighbours_opt, new_data_SCS), Stat(f"{oversampling_method_name}_neighbours", neighbours_array, target_neighbours_opt, new_data_SCS)
+    return Stat(oversampling_method_name, epsilon_array, target_neighbours_opt['SCS'].to_list(), new_data_SCS.to_list()), Stat(f"{oversampling_method_name}_neighbours", neighbours_array, target_neighbours_opt.to_list(), new_data_SCS.to_list())
 
 
 def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_validation: str, points_regressor, max_iterations=1):

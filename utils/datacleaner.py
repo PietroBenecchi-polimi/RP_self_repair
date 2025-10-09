@@ -2,6 +2,11 @@ import pandas as pd
 from typing import List, Dict
 from self_repair.stats import Stat
 
+from typing import List, Dict, Any
+import pandas as pd
+from itertools import zip_longest
+
+
 # Transformation rules
 transform_rules = {
     'HUM_1_FW': {'free': 2.0, 'foc': 0.0, 'distr': 1.0},
@@ -130,32 +135,143 @@ def castIntegerFeatures(data):
             data[feature] = data[feature].astype(int)
     return data
 
-def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
-    """Flatten the list of stats into a DataFrame suitable for boxplotting."""
+def audit_stats(stats_per_points):
+    print("== audit ==")
+    for i, exp in enumerate(stats_per_points[:10]):  # sample first 2 experiments
+        stats = exp.get('stats', [])
+        print(f"exp {i}: type(stats)={type(stats)}, len={len(stats)}")
+        if stats:
+            s0 = stats[5]
+            print("first stat type:", type(s0))
+            print("has neighbours_optimized:", hasattr(s0, "neighbours_optimized"))
+            print("has neighbours_validation:", hasattr(s0, "neighbours_validation"))
+            try:
+                print("repr:\n", repr(s0))
+            except Exception as e:
+                print("repr failed:", e)
+
+def audit_df(df):
+    print("DF columns:", list(df.columns))
+    print(df.head(3))
+from typing import List, Dict, Any
+import pandas as pd
+from itertools import zip_longest
+import math
+
+def _extract_scs_from_neigh_list(neigh_list) -> list[float]:
+    """Ritorna una lista piatta di SCS da una lista di float/DF/Series/dict."""
+    out: list[float] = []
+    if not isinstance(neigh_list, list):
+        return out
+    for item in neigh_list:
+        # caso float/int
+        if isinstance(item, (int, float)):
+            out.append(float(item))
+            continue
+
+        # caso pandas DataFrame/Series
+        if isinstance(item, pd.DataFrame):
+            if 'SCS' in item.columns:
+                out.extend(item['SCS'].astype(float).tolist())
+            continue
+        if isinstance(item, pd.Series):
+            # se la series rappresenta già SCS, usala; altrimenti prova a convertire
+            try:
+                out.extend(pd.Series(item, dtype=float).tolist())
+            except Exception:
+                pass
+            continue
+
+        # caso dict con chiave 'SCS'
+        if isinstance(item, dict) and 'SCS' in item:
+            v = item['SCS']
+            if isinstance(v, (list, tuple)):
+                out.extend([float(x) for x in v])
+            elif isinstance(v, pd.Series):
+                out.extend(v.astype(float).tolist())
+            elif isinstance(v, pd.DataFrame) and 'SCS' in v.columns:
+                out.extend(v['SCS'].astype(float).tolist())
+            elif isinstance(v, (int, float)):
+                out.append(float(v))
+            # altri tipi: ignora
+    return out
+
+def _normalize_epsilons(raw_eps) -> list[float]:
+    """Converte epsilon_points a lista di float.
+       Se è un DataFrame con 'SCS', usa quella colonna."""
+    if raw_eps is None:
+        return []
+    if isinstance(raw_eps, pd.DataFrame):
+        if 'SCS' in raw_eps.columns:
+            return raw_eps['SCS'].astype(float).tolist()
+        return []
+    if isinstance(raw_eps, pd.Series):
+        try:
+            return raw_eps.astype(float).tolist()
+        except Exception:
+            return []
+    if isinstance(raw_eps, (list, tuple)):
+        return [float(x) for x in raw_eps]
+    if isinstance(raw_eps, (int, float)):
+        return [float(raw_eps)]
+    # fallback: prova a iterare
+    try:
+        return [float(x) for x in list(raw_eps)]
+    except Exception:
+        return []
+
+def process_results(stats_per_points: List[Dict[str, Any]]) -> pd.DataFrame:
+    """
+    Crea un DataFrame flatten:
+      - Epsilons: da list/scalar o da DataFrame['SCS'] quando opportuno.
+      - neighbours_optimized / neighbours_validation: estrae TUTTE le SCS
+        (float diretti o tutte le righe della colonna SCS dei DataFrame).
+      - Allinea lunghezze via zip_longest; se c'è un solo epsilon e molte SCS, fa broadcast.
+    """
     data = []
 
     for experiment in stats_per_points:
         r_points = experiment['regressor_points']
         s_points = experiment['resampling_points']
-        stats: list[Stat] = experiment['stats']
+        stats_list = experiment['stats']  # list[Stat]
 
-        for stat in stats:
-            method = stat.get_method_name()
-            epsilon_points = stat.get_epsilon_points()
-            if(isinstance(epsilon_points, list)):
-                for eps in stat.get_epsilon_points():
-                    data.append({
-                        'Method': method,
-                        'Regressor Points': r_points,
-                        'Resampling Points': s_points,
-                        'Epsilons': eps
-                    })
-            elif(isinstance(epsilon_points, Dict)):
-                for eps in epsilon_points.values():
-                    data.append({
-                        'Method': method,
-                        'Regressor Points': r_points,
-                        'Resampling Points': s_points,
-                        'Epsilons': eps
-                    })
-    return pd.DataFrame(data)
+        for stat in stats_list:
+            method = getattr(stat, "method_name", None)
+
+            # 1) Epsilons
+            raw_eps = getattr(stat, "epsilon_points", None)
+            eps_list = _normalize_epsilons(raw_eps)
+
+            # 2) Neighbours → estrai TUTTE le SCS presenti
+            opt_vals = _extract_scs_from_neigh_list(getattr(stat, "neighbours_optimized", []))
+            val_vals = _extract_scs_from_neigh_list(getattr(stat, "neighbours_validation", []))
+
+            # 3) Allineamento lunghezze
+            n = max(len(eps_list), len(opt_vals), len(val_vals), 0)
+            if len(eps_list) == 1 and n > 1:
+                eps_list = [eps_list[0]] * n
+            # pad neighbours
+            if len(opt_vals) < n:
+                opt_vals = opt_vals + [None] * (n - len(opt_vals))
+            if len(val_vals) < n:
+                val_vals = val_vals + [None] * (n - len(val_vals))
+
+            # 4) Costruisci righe (se eps mancante, lo lasciamo None: gestibile a valle)
+            for eps, opt, val in zip_longest(eps_list, opt_vals, val_vals, fillvalue=None):
+                data.append({
+                    'Method': method,
+                    'Regressor Points': r_points,
+                    'Resampling Points': s_points,
+                    'Epsilons': eps,
+                    'neighbours_optimized': opt,
+                    'neighbours_validation': val,
+                })
+
+    df = pd.DataFrame(data)
+
+    # garantisci colonne
+    for col in ['neighbours_optimized', 'neighbours_validation', 'Epsilons']:
+        if col not in df.columns:
+            df[col] = None
+
+    return df

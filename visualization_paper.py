@@ -1,5 +1,5 @@
 import pickle
-import utils.datacleaner as dc
+import fix as dc
 import os
 import pickle
 import pandas as pd
@@ -9,28 +9,22 @@ from matplotlib import gridspec
 
 
 def analyze_success_from_pkl_with_process_results(pkl_path: str, threshold: float, test_name: str) -> None:
-    """
-    Carica un file .pkl con 'stats_per_points', lo passa a process_results(stats_per_points)
-    per ottenere un DataFrame con colonne: ['Method', 'Regressor Points', 'Resampling Points', 'Epsilons'].
-    Quindi:
-      - stampa conteggio globale di valori Epsilons > threshold
-      - calcola e stampa il success-rate per Method (percentuale di Epsilons > threshold)
-      - salva un barplot + tabella (PNG) e un CSV con i risultati in visualization/figs/figs_{test_name}/
-    """
-
+    # create output directory
     out_dir = f"visualization/figs/figs_{test_name}"
     os.makedirs(out_dir, exist_ok=True)
 
+    # load data
     with open(pkl_path, "rb") as f:
         stats_per_points = pickle.load(f)
 
+    # usage
     df = dc.process_results(stats_per_points)
 
     # --- success-rate per Method ---
     grouped = (
-        df.assign(above=lambda d: d["Epsilons"] >= threshold)
+        df.assign(above=lambda d: d["Neighbours_validation"] >= threshold)
           .groupby("Method", as_index=False)
-          .agg(above_count=("above", "sum"), total=("Epsilons", "count"))
+          .agg(above_count=("above", "sum"), total=("Neighbours_validation", "count"))
     )
 
     grouped["success_rate_%"] = grouped["above_count"] / grouped["total"] * 100.0
@@ -102,8 +96,8 @@ def analyze_success_from_pkl_with_process_results(pkl_path: str, threshold: floa
     print(f"Saved bar plot: {img_path}")
 
 if __name__ == "__main__":
-    pkl_path = 'visualization/data/data_regressor_500_over_20_amd_40_regr_gt/oversampling_results_invalid_configs.pkl'
+    pkl_path = 'visualization/data/data_paper_pietro_mc/oversampling_results_invalid_configs.pkl'
     threshold = 0.5
     test_name = "test_1"
 
-    analyze_success_from_pkl_with_process_results(pkl_path, 0.6, "test_1")
+    analyze_success_from_pkl_with_process_results(pkl_path, 0.3, "test_1")
