@@ -6,23 +6,12 @@ from typing import List, Dict
 from utils.rp_logger import logger
 import utils.datacleaner as dc
 
-def save_results(stats_per_points: List[Dict], save_path: str) -> None:
-    """Save results to a Pickle file."""
-    with open(save_path, "wb") as f:
-        pickle.dump(stats_per_points, f)
-
-def load_existing_results(save_path: str) -> List[Dict]:
-    """Load existing results from a Pickle file."""
-    if os.path.exists(save_path):
-        with open(save_path, "rb") as f:
-            return pickle.load(f)
-    return []
 
 def run_experiments(regressor_points: List[int], resampling_points: List[int], second_test_data_str: str, test_name: str) -> List[Dict]:
     save_path = f"output/data_{test_name}/oversampling_results_{second_test_data_str}.pkl"
     os.makedirs(f"output/data_{test_name}", exist_ok=True)
 
-    stats_per_points = load_existing_results(save_path)
+    stats_per_points = []
     existing_combinations = {(d['regressor_points'], d['resampling_points']) 
                             for d in stats_per_points if 'regressor_points' in d}
 
@@ -48,13 +37,12 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
                     "stats": stats
                 }
             )
-            save_results(stats_per_points, save_path)
 
     return stats_per_points
 
 def mono_test_pipeline():
-    regressor_points = [500]
-    resampling_points = [50] 
+    regressor_points = [100]
+    resampling_points = [10] 
 
     if len(sys.argv) < 2:
        logger.error("Please, insert the test name as an argument. It is used to save the results.")
@@ -69,6 +57,7 @@ def mono_test_pipeline():
     invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs", test_name=test_name)
     df_invalid = dc.process_results(invalid_stats)
     df_invalid['Validation Type'] = 'Invalid Configs'
+    df_invalid.to_csv(f"output/data_{test_name}/boxplot_data_invalid_configs.csv", index=False)
         
 if __name__ == "__main__":
     mono_test_pipeline()
