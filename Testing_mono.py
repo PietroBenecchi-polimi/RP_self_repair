@@ -1,11 +1,9 @@
-from self_repair.self_repair_mono import run_oversampling_pipeline
+from self_repair.self_repair import run_oversampling_pipeline
 import os
 import sys
 import pickle
 from typing import List, Dict
-from visualization.visualization import *
 from utils.rp_logger import logger
-import math
 import utils.datacleaner as dc
 
 def save_results(stats_per_points: List[Dict], save_path: str) -> None:
@@ -21,8 +19,9 @@ def load_existing_results(save_path: str) -> List[Dict]:
     return []
 
 def run_experiments(regressor_points: List[int], resampling_points: List[int], second_test_data_str: str, test_name: str) -> List[Dict]:
-    save_path = f"visualization/data/data_{test_name}/oversampling_results_{second_test_data_str}.pkl"
-    os.makedirs(f"visualization/data/data_{test_name}", exist_ok=True)
+    save_path = f"output/data_{test_name}/oversampling_results_{second_test_data_str}.pkl"
+    os.makedirs(f"output/data_{test_name}", exist_ok=True)
+
     stats_per_points = load_existing_results(save_path)
     existing_combinations = {(d['regressor_points'], d['resampling_points']) 
                             for d in stats_per_points if 'regressor_points' in d}
@@ -70,11 +69,7 @@ def mono_test_pipeline():
     invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs", test_name=test_name)
     df_invalid = dc.process_results(invalid_stats)
     df_invalid['Validation Type'] = 'Invalid Configs'
-    
-    # plot_single_config_oversampling(invalid_stats, test_name=test_name)
-    plot_allConfigs_boxplot(df_invalid, test_name=test_name)
-    plot_mean_epsilon_per_method(df_invalid, test_name=test_name)
-    
+        
 if __name__ == "__main__":
     mono_test_pipeline()
     

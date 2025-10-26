@@ -1,9 +1,5 @@
 import pandas as pd
-from typing import List, Dict
-from self_repair.stats import Stat
-
 from typing import List, Dict, Any
-import pandas as pd
 from itertools import zip_longest
 
 
@@ -153,10 +149,6 @@ def audit_stats(stats_per_points):
 def audit_df(df):
     print("DF columns:", list(df.columns))
     print(df.head(3))
-from typing import List, Dict, Any
-import pandas as pd
-from itertools import zip_longest
-import math
 
 def _extract_scs_from_neigh_list(neigh_list) -> list[float]:
     """Ritorna una lista piatta di SCS da una lista di float/DF/Series/dict."""

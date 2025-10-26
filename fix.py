@@ -1,9 +1,8 @@
 from typing import List, Dict, Any
 import pandas as pd
-from itertools import zip_longest
 import pickle
 from self_repair.stats import Stat
-
+import numpy as np
 
 def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
     """Flatten the list of stats into a DataFrame suitable for boxplotting."""
@@ -42,10 +41,6 @@ def process_results(stats_per_points: List[Dict]) -> pd.DataFrame:
                     })
 
     return pd.DataFrame(data)
-
-
-import pandas as pd
-import numpy as np
 
 def extract_scs_values(opt_vals) -> list[float]:
     """
