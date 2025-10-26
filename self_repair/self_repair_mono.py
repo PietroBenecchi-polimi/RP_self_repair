@@ -33,7 +33,7 @@ def oversample_retraing_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeli
     new_data_SCS = interface.mc_results_from_configs(target_neighbours_opt.drop(columns=["SCS"]))
     _, neighbours_array = pipeline.validate_configurations(target_neighbours_opt, new_data_SCS)
 
-    return Stat(oversampling_method_name, epsilon_array, target_neighbours_opt['SCS'].to_list(), new_data_SCS.to_list()), Stat(f"{oversampling_method_name}_neighbours", neighbours_array, target_neighbours_opt.to_list(), new_data_SCS.to_list())
+    return Stat(oversampling_method_name, epsilon_array, target_neighbours_opt['SCS'], new_data_SCS), Stat(f"{oversampling_method_name}_neighbours", neighbours_array, target_neighbours_opt, new_data_SCS)
 
 
 def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_validation: str, points_regressor, max_iterations=1):
@@ -44,7 +44,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
         n_data_to_verify=n_data_to_verify
     )
 
-    mc_opt_interface = mc.ModelCheckerInterface()
+    mc_opt_interface = mc.RegressorInterface(p.ground_truth_regressor)
 
     opt_configs = mc_opt_interface.opt_optimization(p.test_set, p.regressor).reset_index(drop=True)
     ground_truth_first_test = mc_opt_interface.mc_results_from_configs(opt_configs.drop(columns=["SCS"]))
@@ -105,7 +105,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
             ) for method in oversampling.keys()
         ]
 
-        with multiprocessing.Pool(processes=1) as pool:
+        with multiprocessing.Pool() as pool:
             parallel_stats = pool.starmap(oversample_retraing_validation, args)
             
         logger.info(all_stats[len(all_stats) - 1].__repr__())

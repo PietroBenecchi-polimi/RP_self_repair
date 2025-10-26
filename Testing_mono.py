@@ -54,7 +54,7 @@ def run_experiments(regressor_points: List[int], resampling_points: List[int], s
     return stats_per_points
 
 def mono_test_pipeline():
-    regressor_points = [1000]
+    regressor_points = [500]
     resampling_points = [50] 
 
     if len(sys.argv) < 2:
