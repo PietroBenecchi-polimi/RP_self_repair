@@ -94,3 +94,46 @@ These parameters are fixed within the script but can be modified directly in the
 | `max_iterations`   | `30`                     | Maximum number of iterations in the oversampling loop. |
 | `n_samples`        | from `resampling_points` | Number of generated samples.                           |
 | `points_regressor` | from `regressor_points`  | Number of regressor training points.                   |
+
+Here’s a concise **new section** you can add to your README to explain this script and how to use it:
+
+---
+
+## ⏱ Measuring Prediction Times
+
+The `time_prediction_model.py` script evaluates the runtime of the regressor’s predictions for a subset of test samples. It records the prediction time for each sample, computes summary statistics (mean and standard deviation), and saves all results in a CSV file.
+
+### **Purpose**
+
+This script is useful to measure the performance of the regressor or ground truth model in terms of prediction speed.
+
+### **Usage**
+
+Run the script from the command line, optionally specifying the number of test samples `n` to evaluate:
+
+```bash
+python time_prediction_model.py <n>
+```
+
+* `<n>`: (optional) Number of samples to test. Defaults to `2` if not provided.
+
+Example:
+
+```bash
+python time_prediction_model.py 5
+```
+
+This will measure prediction times for the first 5 samples in the test dataset.
+
+### **Outputs**
+
+All results are saved under:
+
+```
+output/time_data/time_prediction_model.csv
+```
+
+The CSV contains:
+
+* `Index` — sample index (or `"mean"` / `"std"` for statistics)
+* `PredictionTime_s` — elapsed time in seconds for each prediction
