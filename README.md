@@ -98,6 +98,18 @@ These parameters are fixed within the script but can be modified directly in the
 Here’s a concise **new section** you can add to your README to explain this script and how to use it:
 
 ---
+## ⚙️ `self_repair` Internal Parameters
+
+If you are using ground_truth = ModelCheckerInterface(), it is important to add process = 1 to multiprocessing function.
+
+        with multiprocessing.Pool(processes=1) as pool:
+            parallel_stats = pool.starmap(oversample_retraing_validation, args)
+
+Otherwise if you have ground_truth = RegressorInterface(), you can simply have this to exploit thread parallelism 
+
+        with multiprocessing.Pool() as pool:
+            parallel_stats = pool.starmap(oversample_retraing_validation, args)
+
 
 ## ⏱ Measuring Prediction Times
 
