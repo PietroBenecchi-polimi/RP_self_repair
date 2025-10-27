@@ -45,9 +45,9 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
     )
 
     # altra versione in codice commentato 
-    # mc_opt_interface = mc.ModelCheckerIntercafe()
+    mc_opt_interface = mc.ModelCheckerInterface()
 
-    mc_opt_interface = mc.RegressorInterface(p.ground_truth_regressor)
+    # mc_opt_interface = mc.RegressorInterface(p.ground_truth_regressor)
 
     opt_configs = mc_opt_interface.opt_optimization(p.test_set, p.regressor).reset_index(drop=True)
     ground_truth_first_test = mc_opt_interface.mc_results_from_configs(opt_configs.drop(columns=["SCS"]))
@@ -108,7 +108,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
             ) for method in oversampling.keys()
         ]
 
-        with multiprocessing.Pool() as pool:
+        with multiprocessing.Pool(processes=1) as pool:
             parallel_stats = pool.starmap(oversample_retraing_validation, args)
             
         logger.info(all_stats[len(all_stats) - 1].__repr__())
