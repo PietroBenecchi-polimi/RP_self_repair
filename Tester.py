@@ -97,7 +97,7 @@ def mono_test_pipeline():
     """
     regressor_points = [100]
     resampling_points = [2]
-    ground_truth = RegressorInterface()  # Change to RegressorInterface() if needed
+    ground_truth = ModelCheckerInterface()  # Change to RegressorInterface() if needed
 
     # Check for valid test name argument
     if len(sys.argv) < 2:

@@ -30,6 +30,8 @@ class ModelCheckerInterface(MC_OPT_INTERFACE):
         logger.info("Running NSGA-II optimization (no cache)...")
         result = optimize_configurations(new_configs.reset_index(drop=True), scs_regressor)
         return result.drop(columns=["FTG"])
+    def setgroundTruth(self, scs_regressor) -> pd.DataFrame:
+        pass
 
 
 class RegressorInterface(MC_OPT_INTERFACE):
