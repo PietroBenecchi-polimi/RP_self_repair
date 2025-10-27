@@ -30,25 +30,22 @@ It automates the process of testing multiple parameter configurations and saves 
 
 ## Usage
 
-Run the script from the command line, providing a single argument: the **test name**.
+Run the script from the command line, providing a single argument: the **test name**. The script will run experiments using the `RegressorInterface` as ground truth, process the results, and save them in CSV and JSON formats.
 
 ```bash
-python run_experiment.py <test_name>
-````
----
-
-## 📊 Outputs
-
-All results are saved under:
-
-```
-output/data_<test_name>/
+python Testing_mono.py <test_name>
 ```
 
-The following files will be generated:
+Optionally, you can edit the script to change the `regressor_points` and `resampling_points` lists to test different parameter configurations. The results and logs will be saved under:
 
-* **`oversampling_results_invalid_configs.pkl`** — raw statistics from each experiment run.
-* **`boxplot_data_invalid_configs.csv`** — processed results ready for visualization (e.g., boxplots).
+```
+output/<test_name>/
+```
+
+The following files are generated:
+
+* **`experiment_results.csv`** — CSV file containing processed statistics for each combination of regressor and resampling points.
+* **`overview.txt`** — JSON file containing configuration details, environment info, and timestamp for reproducibility.
 
 ---
 
@@ -73,6 +70,19 @@ The following files will be generated:
 * **Example:** `[10, 20, 50]`
 
 ---
+
+### **`ground_truth`**
+
+* **Type:** `MC_OPT_INTERFACE` (or subclass)
+* **Description:** The model used as the reference for verifying oversampling performance. Can be either a `ModelCheckerInterface` or a `RegressorInterface`.
+* **Effect:** Determines how predictions are computed and compared during experiments.
+* **Default:** `RegressorInterface()` in the current script
+* **Example:**
+
+  ```python
+  ground_truth = ModelCheckerInterface()  # Uses model checker as ground truth
+  ground_truth = RegressorInterface()     # Uses a regressor as ground truth
+  ```
 
 ## ⚙️ `run_oversampling_pipeline` Internal Parameters
 
