@@ -149,3 +149,40 @@ The CSV contains:
 
 * `Index` — sample index (or `"mean"` / `"std"` for statistics)
 * `PredictionTime_s` — elapsed time in seconds for each prediction
+
+---
+
+## ⏱ Benchmarking Oversampling Methods
+
+The `benchmark_methods.py` script measures the execution time of different oversampling methods on a fixed subset of test data. It runs each method repeatedly for a specified number of runs (`n_runs`) and generates a defined number of synthetic samples per run (`n_samples`). The script records the time taken for each run, checks for errors, and saves all results in a CSV file. It also computes summary statistics per method—including mean, standard deviation, min, max, quartiles, and variance—and saves them in a separate CSV file. A boxplot of execution times per method is also generated for visual comparison.
+
+### **Usage**
+
+Run the script from the command line, optionally specifying `n_runs` and `n_samples`:
+
+```bash
+python benchmark_methods.py <n_runs> <n_samples>
+```
+
+* `<n_runs>`: (optional) Number of repetitions per method. Defaults to `10`.
+* `<n_samples>`: (optional) Number of synthetic samples generated per run. Defaults to `30`.
+
+Example:
+
+```bash
+python benchmark_methods.py 15 50
+```
+
+This runs 15 repetitions per method, generating 50 synthetic samples per run.
+
+### **Outputs**
+
+All results are saved under:
+
+```
+output/time_data_methods/
+```
+
+* `oversampling_times_repeated.csv` — raw execution times and error logs for each run.
+
+No additional console output is required; all data is ready for analysis or benchmarking.
