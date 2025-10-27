@@ -5,8 +5,7 @@ import pandas as pd
 import multiprocessing
 import numpy as np
 
-import self_repair.mc_opt_interface as mc
-from self_repair.mc_opt_interface import MC_OPT_INTERFACE
+from self_repair.mc_opt_interface import MC_OPT_INTERFACE, RegressorInterface
 
 from self_repair.pipeline import Pipeline
 from self_repair.stats import Stat
@@ -36,7 +35,7 @@ def oversample_retraing_validation(interface: MC_OPT_INTERFACE, pipeline: Pipeli
     return Stat(oversampling_method_name, epsilon_array, target_neighbours_opt['SCS'], new_data_SCS), Stat(f"{oversampling_method_name}_neighbours", neighbours_array, target_neighbours_opt, new_data_SCS)
 
 
-def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_validation: str, points_regressor, max_iterations=1):
+def run_oversampling_pipeline(n_data_to_verify, n_samples, points_regressor, mc_opt_interface: MC_OPT_INTERFACE, max_iterations=1):
     p = Pipeline(
         training_dataset_path="data/dataset1000.csv",
         test_data_path="data/initial_configurations_to_improve.csv",
@@ -44,10 +43,8 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
         n_data_to_verify=n_data_to_verify
     )
 
-    # altra versione in codice commentato 
-    mc_opt_interface = mc.ModelCheckerInterface()
-
-    # mc_opt_interface = mc.RegressorInterface(p.ground_truth_regressor)
+    if(isinstance(mc_opt_interface, RegressorInterface)):
+        mc_opt_interface.setgroundTruth(p.ground_truth_regressor)
 
     opt_configs = mc_opt_interface.opt_optimization(p.test_set, p.regressor).reset_index(drop=True)
     ground_truth_first_test = mc_opt_interface.mc_results_from_configs(opt_configs.drop(columns=["SCS"]))
@@ -110,7 +107,7 @@ def run_oversampling_pipeline(n_data_to_verify, n_samples, data_type_second_vali
 
         with multiprocessing.Pool(processes=1) as pool:
             parallel_stats = pool.starmap(oversample_retraing_validation, args)
-            
+
         logger.info(all_stats[len(all_stats) - 1].__repr__())
         logger.info(all_stats[len(all_stats) - 2].__repr__())
         for stat in parallel_stats:

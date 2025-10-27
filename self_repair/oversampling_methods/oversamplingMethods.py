@@ -3,8 +3,6 @@ import numpy as np
 import json
 import smogn
 from sklearn.neighbors import KernelDensity
-from sklearn.cluster import KMeans
-from imblearn.over_sampling import SMOTE, ADASYN, BorderlineSMOTE
 from self_repair.oversampling_methods.LIME import explain_prediction_with_lime
 from utils.datacleaner import get_transformation_rules
 import utils.datacleaner as dc
@@ -180,75 +178,3 @@ class SmoteOversampling(SmoteBasedOversampling):
             rel_thres=df['SCS'].quantile(0.9)
         )
         self.setResampling(dc.castIntegerFeatures(df_resampled))
-
-class ADASYNOversampling(SmoteBasedOversampling):
-    def __init__(self, unbalanced_dataset: pd.DataFrame = pd.DataFrame()):
-        super().__init__(unbalanced_dataset)
-        self.name_id = "ADASYN"
-
-    def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
-        df = df.sample(n_samples) if len(df) > n_samples else df
-        df.reset_index(drop=True)
-        X = df.drop(columns=["SCS"])
-        y = df["SCS"]
-        y_class = (y > 0.5).astype(int)
-
-        ada = ADASYN(sampling_strategy='minority', random_state=42)
-        X_res, y_res = ada.fit_resample(X, y_class)
-
-        df_resampled = X_res.copy()
-        df_resampled["SCS"] = y_res
-        self.setResampling(df_resampled)
-
-class BorderlineSMOTEOversampling(SmoteBasedOversampling):
-    def __init__(self, unbalanced_dataset: pd.DataFrame = pd.DataFrame()):
-        super().__init__(unbalanced_dataset)
-        self.name_id = "BorderlineSMOTE"
-
-    def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
-        df = df.sample(n_samples) if len(df) > n_samples else df
-        df.reset_index(drop=True)
-        X = df.drop(columns=["SCS"])
-        y = df["SCS"]
-        y_class = (y > 0.5).astype(int)
-
-        sm = BorderlineSMOTE(sampling_strategy='minority', random_state=42)
-        X_res, y_res = sm.fit_resample(X, y_class)
-
-        df_resampled = X_res.copy()
-        df_resampled["SCS"] = y_res
-        self.setResampling(df_resampled)
-
-class ClusterSMOTEOversampling(SmoteBasedOversampling):
-    def __init__(self, unbalanced_dataset: pd.DataFrame = pd.DataFrame()):
-        super().__init__(unbalanced_dataset)
-        self.name_id = "ClusterSMOTE"
-
-    def run_oversampling(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
-        df = df.sample(n_samples) if len(df) > n_samples else df
-        df.reset_index(drop=True)
-        X = df.drop(columns=["SCS"])
-        y = df["SCS"]
-        y_class = (y > 0.5).astype(int)
-
-        X = X.copy()
-        kmeans = KMeans(n_clusters=3, random_state=42)
-        clusters = kmeans.fit_predict(X)
-        X["cluster"] = clusters
-
-        dfs = []
-        for cl in np.unique(clusters):
-            sub_df = X[X["cluster"] == cl].drop(columns=["cluster"])
-            sub_y = y_class[X["cluster"] == cl]
-
-            if sub_y.nunique() < 2:
-                continue
-
-            sm = SMOTE(sampling_strategy='minority', random_state=42)
-            X_res, y_res = sm.fit_resample(sub_df, sub_y)
-
-            tmp_df = X_res.copy()
-            tmp_df["SCS"] = y_res
-            dfs.append(tmp_df)
-
-        self.setResampling(pd.concat(dfs, ignore_index=True))

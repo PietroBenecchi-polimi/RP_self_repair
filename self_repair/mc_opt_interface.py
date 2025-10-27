@@ -14,6 +14,9 @@ class MC_OPT_INTERFACE(ABC):
     @abstractmethod
     def opt_optimization(self, new_configs: pd.DataFrame, scs_regressor) -> pd.DataFrame:
         pass
+    @abstractmethod
+    def setgroundTruth(self, new_configs: pd.DataFrame, scs_regressor) -> pd.DataFrame:
+        pass
 
 
 class ModelCheckerInterface(MC_OPT_INTERFACE):
@@ -30,8 +33,8 @@ class ModelCheckerInterface(MC_OPT_INTERFACE):
 
 
 class RegressorInterface(MC_OPT_INTERFACE):
-    def __init__(self, scs_ground_truth_regressor):
-        self.scs_ground_truth_regressor = scs_ground_truth_regressor
+    def __init__(self):
+        pass
 
     def mc_results_from_configs(self, new_configs: pd.DataFrame) -> pd.DataFrame:
         logger.info("Predicting with regressor (no cache)...")
@@ -44,3 +47,6 @@ class RegressorInterface(MC_OPT_INTERFACE):
         logger.info("Running NSGA-II optimization (no cache)...")
         result = optimize_configurations(new_configs.reset_index(drop=True), scs_regressor)
         return result.drop(columns=["FTG"])
+    
+    def setgroundTruth(self, scs_regressor) -> pd.DataFrame:
+        self.scs_ground_truth_regressor = scs_regressor

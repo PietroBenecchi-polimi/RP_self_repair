@@ -75,7 +75,7 @@ class Pipeline:
 
         def run_method(cls: OversamplingMethod):
             start_time = time.perf_counter()
-            logging.info(f"🚀 Starting oversampling method: {cls.__name__}")
+            logging.info(f"Starting oversampling method: {cls.__name__}")
 
             if cls == LimeBasedOversampling:
                 instance: OversamplingMethod = cls(self.regressor)
@@ -91,7 +91,7 @@ class Pipeline:
                 instance.run_oversampling(df=self.test_set.copy(), n_samples=n_samples)
 
             elapsed = time.perf_counter() - start_time
-            logging.info(f"✅ Finished {cls.__name__} in {elapsed:.2f} seconds")
+            logging.info(f"Finished {cls.__name__} in {elapsed:.2f} seconds")
 
             return instance.name_id, instance.getResampling()
 
@@ -101,7 +101,7 @@ class Pipeline:
                 name, resampled_df = future.result()
                 results_dict[name] = resampled_df
 
-        logging.info("🎯 All oversampling methods completed successfully.")
+        logging.info("All oversampling methods completed successfully.")
         return results_dict
 
     
