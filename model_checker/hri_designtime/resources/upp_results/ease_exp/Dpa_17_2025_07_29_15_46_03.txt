@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1753803963
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_17.q:1
+ -- Throughput: 200361 runs/sec, Load: 347 runs[K -- Throughput: 218354 runs/sec, Load: 301 runs[K -- Throughput: 226871 runs/sec, Load: 253 runs[K -- Throughput: 243978 runs/sec, Load: 199 runs[K -- Throughput: 241942 runs/sec, Load: 147 runs[K -- Throughput: 238899 runs/sec, Load: 95 runs[K -- Throughput: 235714 runs/sec, Load: 45 runs[K[2K -- Formula is satisfied.
+ -- Result: (145/391 runs) Pr(<> …) in [0.322825,0.420835] (95% CI)
+Values in [78.184687197377613,151.08352863214418] mean=108.28514812983377 steps=5.6076031872897367: 11 8 22 13 18 15 16 11 10 8 4 8 1
+ -- States explored : 1823001 states
+ -- CPU user time used : 7900 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58784 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_17.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0528523 ± 0.0265262 (95% CI)
+
+Values in [0.0049875208073176802,0.12628408831196525] mean=0.052852290757289956 steps=0.030324141876161899: 3 3 3 1
+ -- States explored : 77937 states
+ -- CPU user time used : 429 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58784 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_17.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.117445 ± 0.0901622 (95% CI)
+
+Values in [0,0.27388624768799341] mean=0.11744529381300894 steps=0.068471561921998367: 5 0 1 4
+ -- States explored : 79183 states
+ -- CPU user time used : 443 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58784 KiB

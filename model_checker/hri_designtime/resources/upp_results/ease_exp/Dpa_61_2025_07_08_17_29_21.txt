@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751995761
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_61.q:1
+ -- Throughput: 246622 runs/sec, Load: 352 runs[K -- Throughput: 269669 runs/sec, Load: 312 runs[K -- Throughput: 272909 runs/sec, Load: 271 runs[K -- Throughput: 276651 runs/sec, Load: 228 runs[K -- Throughput: 272187 runs/sec, Load: 186 runs[K -- Throughput: 276878 runs/sec, Load: 144 runs[K -- Throughput: 274712 runs/sec, Load: 101 runs[K -- Throughput: 266997 runs/sec, Load: 59 runs[K -- Throughput: 274326 runs/sec, Load: 17 runs[K[2K -- Formula is satisfied.
+ -- Result: (188/404 runs) Pr(<> …) in [0.41588,0.515325] (95% CI)
+Values in [98.81528057510603,225.78217503033741] mean=144.24865806759999 steps=9.069063889659386: 8 30 23 15 22 18 30 8 10 15 4 1 3 1
+ -- States explored : 2654770 states
+ -- CPU user time used : 9818 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58804 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_61.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0341019 ± 0.0231174 (95% CI)
+
+Values in [0.0031190648097735307,0.093277970220637996] mean=0.034101886648405841 steps=0.02253972635271612: 5 2 1 2
+ -- States explored : 73883 states
+ -- CPU user time used : 351 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58804 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_61.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.071605 ± 0.0511933 (95% CI)
+
+Values in [0,0.2112852874611274] mean=0.07160502200869398 steps=0.052821321865281864: 4 2 3 1
+ -- States explored : 86451 states
+ -- CPU user time used : 416 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58804 KiB

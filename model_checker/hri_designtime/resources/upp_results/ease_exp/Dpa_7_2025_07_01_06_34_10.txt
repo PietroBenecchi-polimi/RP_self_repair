@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751351650
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_7.q:1
+ -- Throughput: 189792 runs/sec, Load: 371 runs[K -- Throughput: 214398 runs/sec, Load: 350 runs[K -- Throughput: 216443 runs/sec, Load: 328 runs[K -- Throughput: 210029 runs/sec, Load: 308 runs[K -- Throughput: 215352 runs/sec, Load: 287 runs[K -- Throughput: 205397 runs/sec, Load: 267 runs[K -- Throughput: 203842 runs/sec, Load: 250 runs[K -- Throughput: 208479 runs/sec, Load: 230 runs[K -- Throughput: 211237 runs/sec, Load: 209 runs[K -- Throughput: 214756 runs/sec, Load: 188 runs[K -- Throughput: 213299 runs/sec, Load: 166 runs[K -- Throughput: 216564 runs/sec, Load: 145 runs[K -- Throughput: 206650 runs/sec, Load: 124 runs[K -- Throughput: 206836 runs/sec, Load: 105 runs[K[2K -- Formula is satisfied.
+ -- Result: (63/304 runs) Pr(<> …) in [0.163079,0.257203] (95% CI)
+Values in [162.23762177432127,281.43226973734141] mean=230.94048413690152 steps=14.899330995377522: 2 5 6 16 7 8 8 11
+ -- States explored : 3158147 states
+ -- CPU user time used : 15057 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58804 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_7.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.501901 ± 0.190478 (95% CI)
+
+Values in [0.034394583742433538,0.82003627928688816] mean=0.50190065037374176 steps=0.19641042388611371: 2 1 2 5
+ -- States explored : 99711 states
+ -- CPU user time used : 601 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58804 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_7.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.3822 ± 0.353399 (95% CI)
+
+Values in [0,0.97982399616458782] mean=0.38220032646755975 steps=0.24495599904114701: 6 0 0 4
+ -- States explored : 86891 states
+ -- CPU user time used : 504 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58804 KiB

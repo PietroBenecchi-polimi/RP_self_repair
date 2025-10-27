@@ -30,25 +30,22 @@ It automates the process of testing multiple parameter configurations and saves 
 
 ## Usage
 
-Run the script from the command line, providing a single argument: the **test name**.
+Run the script from the command line, providing a single argument: the **test name**. The script will run experiments using the `RegressorInterface` as ground truth, process the results, and save them in CSV and JSON formats.
 
 ```bash
-python run_experiment.py <test_name>
-````
----
-
-## 📊 Outputs
-
-All results are saved under:
-
-```
-output/data_<test_name>/
+python Testing_mono.py <test_name>
 ```
 
-The following files will be generated:
+Optionally, you can edit the script to change the `regressor_points` and `resampling_points` lists to test different parameter configurations. The results and logs will be saved under:
 
-* **`oversampling_results_invalid_configs.pkl`** — raw statistics from each experiment run.
-* **`boxplot_data_invalid_configs.csv`** — processed results ready for visualization (e.g., boxplots).
+```
+output/<test_name>/
+```
+
+The following files are generated:
+
+* **`experiment_results.csv`** — CSV file containing processed statistics for each combination of regressor and resampling points.
+* **`overview.txt`** — JSON file containing configuration details, environment info, and timestamp for reproducibility.
 
 ---
 
@@ -74,6 +71,19 @@ The following files will be generated:
 
 ---
 
+### **`ground_truth`**
+
+* **Type:** `MC_OPT_INTERFACE` (or subclass)
+* **Description:** The model used as the reference for verifying oversampling performance. Can be either a `ModelCheckerInterface` or a `RegressorInterface`.
+* **Effect:** Determines how predictions are computed and compared during experiments.
+* **Default:** `RegressorInterface()` in the current script
+* **Example:**
+
+  ```python
+  ground_truth = ModelCheckerInterface()  # Uses model checker as ground truth
+  ground_truth = RegressorInterface()     # Uses a regressor as ground truth
+  ```
+
 ## ⚙️ `run_oversampling_pipeline` Internal Parameters
 
 These parameters are fixed within the script but can be modified directly in the source code if needed.
@@ -84,3 +94,46 @@ These parameters are fixed within the script but can be modified directly in the
 | `max_iterations`   | `30`                     | Maximum number of iterations in the oversampling loop. |
 | `n_samples`        | from `resampling_points` | Number of generated samples.                           |
 | `points_regressor` | from `regressor_points`  | Number of regressor training points.                   |
+
+Here’s a concise **new section** you can add to your README to explain this script and how to use it:
+
+---
+
+## ⏱ Measuring Prediction Times
+
+The `time_prediction_model.py` script evaluates the runtime of the regressor’s predictions for a subset of test samples. It records the prediction time for each sample, computes summary statistics (mean and standard deviation), and saves all results in a CSV file.
+
+### **Purpose**
+
+This script is useful to measure the performance of the regressor or ground truth model in terms of prediction speed.
+
+### **Usage**
+
+Run the script from the command line, optionally specifying the number of test samples `n` to evaluate:
+
+```bash
+python time_prediction_model.py <n>
+```
+
+* `<n>`: (optional) Number of samples to test. Defaults to `2` if not provided.
+
+Example:
+
+```bash
+python time_prediction_model.py 5
+```
+
+This will measure prediction times for the first 5 samples in the test dataset.
+
+### **Outputs**
+
+All results are saved under:
+
+```
+output/time_data/time_prediction_model.csv
+```
+
+The CSV contains:
+
+* `Index` — sample index (or `"mean"` / `"std"` for statistics)
+* `PredictionTime_s` — elapsed time in seconds for each prediction

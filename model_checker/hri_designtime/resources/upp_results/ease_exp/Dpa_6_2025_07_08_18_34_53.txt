@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751999693
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_6.q:1
+ -- Throughput: 229419 runs/sec, Load: 345 runs[K -- Throughput: 252855 runs/sec, Load: 296 runs[K -- Throughput: 246154 runs/sec, Load: 249 runs[K -- Throughput: 244849 runs/sec, Load: 203 runs[K -- Throughput: 254701 runs/sec, Load: 154 runs[K -- Throughput: 244845 runs/sec, Load: 103 runs[K -- Throughput: 241442 runs/sec, Load: 56 runs[K -- Throughput: 250282 runs/sec, Load: 6 runs[K[2K -- Formula is satisfied.
+ -- Result: (193/404 runs) Pr(<> …) in [0.428096,0.527678] (95% CI)
+Values in [83.864833851772659,151.85534991956865] mean=119.60744224630621 steps=4.8564654334140007: 9 6 4 19 21 15 16 16 17 18 19 13 8 12
+ -- States explored : 2096600 states
+ -- CPU user time used : 8551 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58616 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_6.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.081739 ± 0.0340556 (95% CI)
+
+Values in [0.0099501662508318933,0.1521062959120838] mean=0.081738956409399224 steps=0.035539032415312984: 2 5 0 3
+ -- States explored : 76851 states
+ -- CPU user time used : 391 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58616 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_6.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.265294 ± 0.171874 (95% CI)
+
+Values in [0,0.61749313516590176] mean=0.26529435386095457 steps=0.15437328379147547: 3 4 0 3
+ -- States explored : 86018 states
+ -- CPU user time used : 427 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58616 KiB

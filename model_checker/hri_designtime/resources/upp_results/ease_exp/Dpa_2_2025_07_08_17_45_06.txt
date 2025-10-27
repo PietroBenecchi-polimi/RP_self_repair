@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751996706
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_2.q:1
+ -- Throughput: 270492 runs/sec, Load: 372 runs[K -- Throughput: 301938 runs/sec, Load: 350 runs[K -- Throughput: 285829 runs/sec, Load: 330 runs[K -- Throughput: 303469 runs/sec, Load: 307 runs[K -- Throughput: 291618 runs/sec, Load: 284 runs[K -- Throughput: 304611 runs/sec, Load: 261 runs[K -- Throughput: 295141 runs/sec, Load: 239 runs[K -- Throughput: 291991 runs/sec, Load: 217 runs[K -- Throughput: 304410 runs/sec, Load: 194 runs[K -- Throughput: 298591 runs/sec, Load: 173 runs[K -- Throughput: 308046 runs/sec, Load: 151 runs[K -- Throughput: 292395 runs/sec, Load: 132 runs[K -- Throughput: 291959 runs/sec, Load: 110 runs[K -- Throughput: 300432 runs/sec, Load: 88 runs[K[2K -- Formula is satisfied.
+ -- Result: (72/319 runs) Pr(<> …) in [0.180998,0.275587] (95% CI)
+Values in [147.91102111532149,280.76927199380106] mean=196.21321951319086 steps=14.762027875386622: 5 14 21 10 9 7 2 2 2
+ -- States explored : 4456478 states
+ -- CPU user time used : 15118 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58744 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_2.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0912871 ± 0.0540445 (95% CI)
+
+Values in [0,0.22508350203891847] mean=0.091287118754481672 steps=0.056270875509729631: 4 3 1 2
+ -- States explored : 81017 states
+ -- CPU user time used : 376 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58744 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_2.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = ≈ 0
+
+Values in [0,0] mean=0 steps=2.2204460492503131e-16: 10
+ -- States explored : 71678 states
+ -- CPU user time used : 314 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58744 KiB

@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751416140
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_11.q:1
+ -- Throughput: 264923 runs/sec, Load: 356 runs[K -- Throughput: 297332 runs/sec, Load: 311 runs[K -- Throughput: 298148 runs/sec, Load: 266 runs[K -- Throughput: 300305 runs/sec, Load: 224 runs[K -- Throughput: 296108 runs/sec, Load: 181 runs[K -- Throughput: 291650 runs/sec, Load: 138 runs[K -- Throughput: 289750 runs/sec, Load: 96 runs[K -- Throughput: 292703 runs/sec, Load: 55 runs[K -- Throughput: 294195 runs/sec, Load: 15 runs[K[2K -- Formula is satisfied.
+ -- Result: (141/389 runs) Pr(<> …) in [0.314619,0.412428] (95% CI)
+Values in [69.823536597402281,164.2282368991699] mean=93.678316088499869 steps=7.8670583584806364: 39 31 14 11 10 15 10 1 0 4 4 2
+ -- States explored : 2741498 states
+ -- CPU user time used : 9388 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58700 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_11.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.00775478 ± 0.00366111 (95% CI)
+
+Values in [0.00051968373458555206,0.017233187587471721] mean=0.0077547769388466529 steps=0.0041783759632215431: 3 3 3 1
+ -- States explored : 79434 states
+ -- CPU user time used : 358 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58700 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_11.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0300878 ± 0.0248208 (95% CI)
+
+Values in [0,0.09763149652890013] mean=0.030087835623588521 steps=0.024407874132225039: 5 3 0 2
+ -- States explored : 81323 states
+ -- CPU user time used : 372 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58700 KiB

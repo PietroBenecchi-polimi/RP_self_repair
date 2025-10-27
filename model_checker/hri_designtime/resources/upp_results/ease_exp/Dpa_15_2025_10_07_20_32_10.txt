@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1759869130
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_15.q:1
+ -- Throughput: 215600 runs/sec, Load: 361 runs[K -- Throughput: 224839 runs/sec, Load: 337 runs[K -- Throughput: 232078 runs/sec, Load: 309 runs[K -- Throughput: 229243 runs/sec, Load: 282 runs[K -- Throughput: 228125 runs/sec, Load: 255 runs[K -- Throughput: 220011 runs/sec, Load: 229 runs[K -- Throughput: 221083 runs/sec, Load: 203 runs[K -- Throughput: 214208 runs/sec, Load: 179 runs[K[2K -- Formula is satisfied.
+ -- Result: (23/212 runs) Pr(<> …) in [0.0700282,0.158333] (95% CI)
+Values in [109.93900486411341,202.13546604717084] mean=149.52178625822461 steps=18.43929223661149: 8 5 2 5 3
+ -- States explored : 1820126 states
+ -- CPU user time used : 8156 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58688 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_15.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.382151 ± 0.188243 (95% CI)
+
+Values in [0.034394583742433538,0.77007451481327638] mean=0.38215069846212968 steps=0.18391998276771074: 3 2 3 2
+ -- States explored : 89603 states
+ -- CPU user time used : 523 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58688 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_15.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.483591 ± 0.364877 (95% CI)
+
+Values in [0,0.99675810294405376] mean=0.48359146258611113 steps=0.2491895257360135: 5 0 0 5
+ -- States explored : 89180 states
+ -- CPU user time used : 521 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58688 KiB

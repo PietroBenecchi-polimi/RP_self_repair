@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1753363910
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_7.q:1
+ -- Throughput: 247472 runs/sec, Load: 335 runs[K -- Throughput: 259976 runs/sec, Load: 279 runs[K -- Throughput: 271380 runs/sec, Load: 221 runs[K -- Throughput: 264631 runs/sec, Load: 163 runs[K -- Throughput: 260031 runs/sec, Load: 106 runs[K -- Throughput: 268793 runs/sec, Load: 49 runs[K -- Throughput: 259437 runs/sec, Load: -7 runs[K[2K -- Formula is satisfied.
+ -- Result: (201/402 runs) Pr(<> …) in [0.450035,0.549965] (95% CI)
+Values in [76.129488620589726,151.85010108851512] mean=108.62004699201096 steps=5.0480408311950269: 15 9 17 21 16 22 25 15 12 10 9 6 8 8 8
+ -- States explored : 1880305 states
+ -- CPU user time used : 7198 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58600 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_7.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0540353 ± 0.0304469 (95% CI)
+
+Values in [0.014888060396937242,0.14785621103378832] mean=0.054035306341334854 steps=0.033242037659212777: 7 1 1 1
+ -- States explored : 86563 states
+ -- CPU user time used : 419 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58600 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_7.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.13212 ± 0.119847 (95% CI)
+
+Values in [0,0.50981850499429937] mean=0.13211951907868336 steps=0.12745462624857487: 5 4 0 1
+ -- States explored : 80347 states
+ -- CPU user time used : 375 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58600 KiB

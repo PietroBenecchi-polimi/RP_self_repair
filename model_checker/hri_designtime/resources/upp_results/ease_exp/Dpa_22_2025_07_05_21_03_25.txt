@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751749405
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_22.q:1
+ -- Throughput: 234458 runs/sec, Load: 365 runs[K -- Throughput: 261213 runs/sec, Load: 338 runs[K -- Throughput: 256739 runs/sec, Load: 310 runs[K -- Throughput: 272673 runs/sec, Load: 281 runs[K -- Throughput: 257136 runs/sec, Load: 251 runs[K -- Throughput: 261336 runs/sec, Load: 225 runs[K -- Throughput: 260051 runs/sec, Load: 196 runs[K -- Throughput: 275913 runs/sec, Load: 164 runs[K -- Throughput: 272283 runs/sec, Load: 135 runs[K -- Throughput: 259313 runs/sec, Load: 103 runs[K[2K -- Formula is satisfied.
+ -- Result: (63/304 runs) Pr(<> …) in [0.163079,0.257203] (95% CI)
+Values in [91.896990693140054,228.15742571648968] mean=148.59044920297237 steps=17.032554377918707: 8 9 14 10 8 7 2 5
+ -- States explored : 2791040 states
+ -- CPU user time used : 10633 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58628 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_22.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.306118 ± 0.191443 (95% CI)
+
+Values in [0,0.67372020537696087] mean=0.30611793519937813 steps=0.16843005134424024: 4 2 1 3
+ -- States explored : 77422 states
+ -- CPU user time used : 361 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58628 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_22.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.39024 ± 0.360431 (95% CI)
+
+Values in [0,0.9932519165924748] mean=0.39023983596735529 steps=0.24831297914811876: 6 0 0 4
+ -- States explored : 85764 states
+ -- CPU user time used : 397 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58628 KiB

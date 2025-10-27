@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1753717833
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_80.q:1
+ -- Throughput: 198228 runs/sec, Load: 366 runs[K -- Throughput: 226170 runs/sec, Load: 339 runs[K -- Throughput: 231536 runs/sec, Load: 313 runs[K -- Throughput: 228136 runs/sec, Load: 284 runs[K -- Throughput: 224789 runs/sec, Load: 258 runs[K -- Throughput: 249093 runs/sec, Load: 232 runs[K -- Throughput: 243402 runs/sec, Load: 203 runs[K -- Throughput: 238644 runs/sec, Load: 175 runs[K -- Throughput: 225254 runs/sec, Load: 147 runs[K -- Throughput: 233201 runs/sec, Load: 123 runs[K -- Throughput: 242941 runs/sec, Load: 99 runs[K -- Throughput: 228623 runs/sec, Load: 73 runs[K -- Throughput: 221896 runs/sec, Load: 48 runs[K -- Throughput: 227896 runs/sec, Load: 22 runs[K -- Throughput: 230122 runs/sec, Load: -5 runs[K[2K -- Formula is satisfied.
+ -- Result: (200/402 runs) Pr(<> …) in [0.447566,0.547495] (95% CI)
+Values in [98.885420951081869,235.13811858824383] mean=143.85953600468795 steps=9.0835131758107988: 9 31 28 16 26 27 18 11 11 6 10 1 2 1 3
+ -- States explored : 3563968 states
+ -- CPU user time used : 15504 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58624 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_80.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0874085 ± 0.0380505 (95% CI)
+
+Values in [0.019801326693244636,0.17304086605663738] mean=0.087408470337366179 steps=0.038309884840848192: 4 0 4 2
+ -- States explored : 77074 states
+ -- CPU user time used : 464 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58624 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_80.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.22078 ± 0.190074 (95% CI)
+
+Values in [0,0.69500939866675182] mean=0.22078004180377495 steps=0.17375234966668798: 5 1 2 2
+ -- States explored : 82290 states
+ -- CPU user time used : 494 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58624 KiB

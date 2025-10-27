@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1750008959
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_54.q:1
+ -- Throughput: 267646 runs/sec, Load: 353 runs[K -- Throughput: 279793 runs/sec, Load: 311 runs[K -- Throughput: 294493 runs/sec, Load: 273 runs[K -- Throughput: 291821 runs/sec, Load: 234 runs[K -- Throughput: 287222 runs/sec, Load: 192 runs[K -- Throughput: 287921 runs/sec, Load: 154 runs[K -- Throughput: 303202 runs/sec, Load: 113 runs[K -- Throughput: 293727 runs/sec, Load: 72 runs[K -- Throughput: 283150 runs/sec, Load: 29 runs[K -- Throughput: 286497 runs/sec, Load: -13 runs[K[2K -- Formula is satisfied.
+ -- Result: (207/403 runs) Pr(<> …) in [0.463663,0.563431] (95% CI)
+Values in [76.138547667986273,212.06371785608445] mean=116.94554822910763 steps=9.0616780125398808: 12 32 28 29 32 21 18 11 10 6 2 1 1 2 2
+ -- States explored : 2905108 states
+ -- CPU user time used : 10101 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58768 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_54.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.049372 ± 0.0294421 (95% CI)
+
+Values in [0,0.13929202357494186] mean=0.049371954346508741 steps=0.034823005893735472: 5 3 1 1
+ -- States explored : 79449 states
+ -- CPU user time used : 372 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58768 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_54.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.148122 ± 0.135188 (95% CI)
+
+Values in [0,0.56760197270653556] mean=0.14812169035341585 steps=0.14190049317663392: 5 4 0 1
+ -- States explored : 78220 states
+ -- CPU user time used : 350 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58768 KiB

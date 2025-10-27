@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1753673942
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_2.q:1
+ -- Throughput: 211087 runs/sec, Load: 365 runs[K -- Throughput: 227653 runs/sec, Load: 340 runs[K -- Throughput: 233097 runs/sec, Load: 314 runs[K -- Throughput: 225353 runs/sec, Load: 287 runs[K -- Throughput: 212114 runs/sec, Load: 262 runs[K -- Throughput: 201143 runs/sec, Load: 240 runs[K -- Throughput: 223370 runs/sec, Load: 215 runs[K -- Throughput: 239287 runs/sec, Load: 187 runs[K[2K -- Formula is satisfied.
+ -- Result: (25/218 runs) Pr(<> …) in [0.0756047,0.164621] (95% CI)
+Values in [133.04402541674884,250.02482891769918] mean=181.31458879423687 steps=23.396160700190073: 5 8 8 2 2
+ -- States explored : 1950890 states
+ -- CPU user time used : 8784 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58744 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_2.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.419322 ± 0.185804 (95% CI)
+
+Values in [0.034394583742433538,0.73552273870017626] mean=0.41932159938116753 steps=0.17528203873943571: 3 1 2 4
+ -- States explored : 82932 states
+ -- CPU user time used : 482 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58744 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_2.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.677377 ± 0.334613 (95% CI)
+
+Values in [0,0.99350119021849292] mean=0.67737699815769303 steps=0.24837529755462329: 3 0 0 7
+ -- States explored : 88594 states
+ -- CPU user time used : 537 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58744 KiB

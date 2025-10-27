@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751793639
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_2.q:1
+ -- Throughput: 244757 runs/sec, Load: 380 runs[K -- Throughput: 266351 runs/sec, Load: 370 runs[K -- Throughput: 275130 runs/sec, Load: 359 runs[K -- Throughput: 275110 runs/sec, Load: 349 runs[K -- Throughput: 262222 runs/sec, Load: 338 runs[K -- Throughput: 274701 runs/sec, Load: 327 runs[K -- Throughput: 269113 runs/sec, Load: 317 runs[K -- Throughput: 270524 runs/sec, Load: 306 runs[K[2K -- Formula is satisfied.
+ -- Result: (1/89 runs) Pr(<> …) in [0.000284429,0.0610183] (95% CI)
+Values in [187.01182629641457,187.01182629641457] mean=187.01182629641457 steps=2.2204460492503131e-16: 1
+ -- States explored : 2310961 states
+ -- CPU user time used : 8635 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58600 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_2.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.557327 ± 0.00409821 (95% CI)
+
+Values in [0.5506710358827791,0.56176500753505154] mean=0.55732741887414261 steps=0.0027734929130681101: 4 0 0 6
+ -- States explored : 107295 states
+ -- CPU user time used : 564 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58600 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_2.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.866595 ± 0.0129684 (95% CI)
+
+Values in [0.84610537398445185,0.8995359535803491] mean=0.8665947015126203 steps=0.013357644898974317: 4 3 1 2
+ -- States explored : 107168 states
+ -- CPU user time used : 554 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58600 KiB

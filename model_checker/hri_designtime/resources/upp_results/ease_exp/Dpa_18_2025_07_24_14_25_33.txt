@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1753367133
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_18.q:1
+ -- Throughput: 245140 runs/sec, Load: 341 runs[K -- Throughput: 259120 runs/sec, Load: 293 runs[K -- Throughput: 271177 runs/sec, Load: 240 runs[K -- Throughput: 271993 runs/sec, Load: 186 runs[K -- Throughput: 256685 runs/sec, Load: 135 runs[K -- Throughput: 270254 runs/sec, Load: 85 runs[K -- Throughput: 264167 runs/sec, Load: 33 runs[K[2K -- Formula is satisfied.
+ -- Result: (201/402 runs) Pr(<> …) in [0.450035,0.549965] (95% CI)
+Values in [83.213782444487435,150.99809219732231] mean=119.87598407542971 steps=4.5189539835223256: 9 5 7 13 16 14 16 19 19 10 14 21 14 8 16
+ -- States explored : 2095467 states
+ -- CPU user time used : 7940 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58652 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_18.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0779273 ± 0.0363338 (95% CI)
+
+Values in [0.0049875208073176802,0.14785621103378832] mean=0.077927306679330829 steps=0.035717172556617667: 2 2 3 3
+ -- States explored : 88272 states
+ -- CPU user time used : 406 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58652 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_18.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.255178 ± 0.148962 (95% CI)
+
+Values in [0,0.55079644826597141] mean=0.25517789481963715 steps=0.13769911206649288: 3 2 2 3
+ -- States explored : 89796 states
+ -- CPU user time used : 439 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58652 KiB
