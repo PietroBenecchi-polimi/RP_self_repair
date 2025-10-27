@@ -56,7 +56,6 @@ def mono_test_pipeline():
     # Perform oversampling pipeline:
     invalid_stats = run_experiments(regressor_points, resampling_points, "invalid_configs", test_name=test_name)
     df_invalid = dc.process_results(invalid_stats)
-    df_invalid['Validation Type'] = 'Invalid Configs'
     df_invalid.to_csv(f"output/data_{test_name}/boxplot_data_invalid_configs.csv", index=False)
         
 if __name__ == "__main__":
