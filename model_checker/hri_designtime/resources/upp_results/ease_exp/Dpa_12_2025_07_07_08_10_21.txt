@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751875821
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:1
+ -- Throughput: 259111 runs/sec, Load: 358 runs[K -- Throughput: 283421 runs/sec, Load: 325 runs[K -- Throughput: 286228 runs/sec, Load: 293 runs[K -- Throughput: 294167 runs/sec, Load: 259 runs[K -- Throughput: 285185 runs/sec, Load: 225 runs[K -- Throughput: 289029 runs/sec, Load: 191 runs[K -- Throughput: 289779 runs/sec, Load: 157 runs[K -- Throughput: 286776 runs/sec, Load: 123 runs[K[2K -- Formula is satisfied.
+ -- Result: (44/268 runs) Pr(<> …) in [0.121899,0.214066] (95% CI)
+Values in [104.93453266450454,252.06175379584724] mean=145.14234885493235 steps=21.018174447334676: 17 8 8 7 2 0 2
+ -- States explored : 2305059 states
+ -- CPU user time used : 8116 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58356 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.423357 ± 0.124921 (95% CI)
+
+Values in [0.18941575402981303,0.72610213566855464] mean=0.42335659752800414 steps=0.13417159540968543: 3 3 2 2
+ -- States explored : 77139 states
+ -- CPU user time used : 361 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58356 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.389111 ± 0.359398 (95% CI)
+
+Values in [0,0.99149464061526693] mean=0.38911114091448351 steps=0.24787366015381679: 6 0 0 4
+ -- States explored : 86439 states
+ -- CPU user time used : 400 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58356 KiB

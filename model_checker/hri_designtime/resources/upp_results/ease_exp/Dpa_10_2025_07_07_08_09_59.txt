@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751875799
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_10.q:1
+ -- Throughput: 245420 runs/sec, Load: 364 runs[K -- Throughput: 271869 runs/sec, Load: 335 runs[K -- Throughput: 260029 runs/sec, Load: 308 runs[K -- Throughput: 273083 runs/sec, Load: 279 runs[K -- Throughput: 276045 runs/sec, Load: 249 runs[K -- Throughput: 259490 runs/sec, Load: 222 runs[K -- Throughput: 265642 runs/sec, Load: 194 runs[K -- Throughput: 269642 runs/sec, Load: 165 runs[K -- Throughput: 272948 runs/sec, Load: 134 runs[K[2K -- Formula is satisfied.
+ -- Result: (39/256 runs) Pr(<> …) in [0.110629,0.202323] (95% CI)
+Values in [189.9764044369247,276.26428636722562] mean=236.3399151054067 steps=12.326840275757279: 1 5 8 9 5 5 6
+ -- States explored : 2431621 states
+ -- CPU user time used : 9134 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58648 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_10.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.527759 ± 0.203534 (95% CI)
+
+Values in [0,0.80011238592485578] mean=0.52775934375052613 steps=0.200028096481214: 2 1 2 5
+ -- States explored : 87824 states
+ -- CPU user time used : 411 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58648 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_10.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.545095 ± 0.338978 (95% CI)
+
+Values in [0,0.99145249935767166] mean=0.5450954724959024 steps=0.24786312483941797: 4 0 0 6
+ -- States explored : 90585 states
+ -- CPU user time used : 431 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58648 KiB

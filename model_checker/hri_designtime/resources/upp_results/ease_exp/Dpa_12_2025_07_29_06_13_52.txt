@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1753769632
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:1
+ -- Throughput: 167264 runs/sec, Load: 378 runs[K -- Throughput: 193529 runs/sec, Load: 364 runs[K -- Throughput: 191341 runs/sec, Load: 354 runs[K -- Throughput: 190069 runs/sec, Load: 339 runs[K -- Throughput: 192642 runs/sec, Load: 327 runs[K -- Throughput: 198569 runs/sec, Load: 312 runs[K -- Throughput: 202679 runs/sec, Load: 298 runs[K -- Throughput: 197052 runs/sec, Load: 286 runs[K -- Throughput: 195992 runs/sec, Load: 273 runs[K -- Throughput: 193286 runs/sec, Load: 259 runs[K -- Throughput: 190322 runs/sec, Load: 247 runs[K -- Throughput: 196676 runs/sec, Load: 236 runs[K -- Throughput: 203823 runs/sec, Load: 223 runs[K -- Throughput: 198623 runs/sec, Load: 210 runs[K -- Throughput: 204229 runs/sec, Load: 198 runs[K -- Throughput: 193483 runs/sec, Load: 185 runs[K -- Throughput: 190981 runs/sec, Load: 173 runs[K -- Throughput: 201153 runs/sec, Load: 160 runs[K -- Throughput: 202281 runs/sec, Load: 148 runs[K -- Throughput: 198745 runs/sec, Load: 134 runs[K -- Throughput: 200824 runs/sec, Load: 121 runs[K -- Throughput: 204663 runs/sec, Load: 107 runs[K -- Throughput: 197597 runs/sec, Load: 93 runs[K -- Throughput: 197943 runs/sec, Load: 81 runs[K -- Throughput: 185141 runs/sec, Load: 70 runs[K -- Throughput: 193136 runs/sec, Load: 59 runs[K -- Throughput: 202103 runs/sec, Load: 46 runs[K -- Throughput: 194111 runs/sec, Load: 35 runs[K -- Throughput: 188182 runs/sec, Load: 23 runs[K -- Throughput: 196628 runs/sec, Load: 10 runs[K -- Throughput: 192061 runs/sec, Load: 0 runs[K -- Throughput: 185912 runs/sec, Load: -11 runs[K[2K -- Formula is satisfied.
+ -- Result: (177/403 runs) Pr(<> …) in [0.390114,0.489198] (95% CI)
+Values in [138.19247121885218,321.7946033680679] mean=200.19794671814608 steps=13.114438010658269: 12 22 24 27 21 16 16 15 5 6 6 4 1 2
+ -- States explored : 6372289 states
+ -- CPU user time used : 32664 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58340 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.290773 ± 0.120875 (95% CI)
+
+Values in [0.048770575499286095,0.5156754310446382] mean=0.29077337298543365 steps=0.11672621388633805: 4 1 2 3
+ -- States explored : 120322 states
+ -- CPU user time used : 732 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58340 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.76871 ± 0.205377 (95% CI)
+
+Values in [0,0.96043855487164287] mean=0.76870986501127325 steps=0.24010963871791077: 1 0 2 7
+ -- States explored : 105233 states
+ -- CPU user time used : 624 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58340 KiB

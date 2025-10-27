@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751877216
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:1
+ -- Throughput: 231797 runs/sec, Load: 368 runs[K -- Throughput: 268017 runs/sec, Load: 341 runs[K -- Throughput: 256824 runs/sec, Load: 315 runs[K -- Throughput: 262383 runs/sec, Load: 288 runs[K -- Throughput: 255952 runs/sec, Load: 262 runs[K -- Throughput: 262380 runs/sec, Load: 236 runs[K -- Throughput: 267539 runs/sec, Load: 210 runs[K -- Throughput: 265638 runs/sec, Load: 183 runs[K -- Throughput: 259275 runs/sec, Load: 158 runs[K -- Throughput: 267470 runs/sec, Load: 131 runs[K -- Throughput: 263473 runs/sec, Load: 104 runs[K[2K -- Formula is satisfied.
+ -- Result: (68/312 runs) Pr(<> …) in [0.173406,0.267937] (95% CI)
+Values in [166.19834682360232,288.30201977824396] mean=227.64113249564909 steps=13.567074772737964: 3 6 9 10 11 9 12 6 2
+ -- States explored : 3145606 states
+ -- CPU user time used : 12064 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58740 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.475633 ± 0.154976 (95% CI)
+
+Values in [0.16054297923079275,0.8379742490661195] mean=0.4756325492606791 steps=0.16935781745883172: 3 2 3 2
+ -- States explored : 103403 states
+ -- CPU user time used : 499 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58740 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.476816 ± 0.359855 (95% CI)
+
+Values in [0,0.98951576927797624] mean=0.47681575861397107 steps=0.24737894231949412: 5 0 0 5
+ -- States explored : 91127 states
+ -- CPU user time used : 455 ms
+ -- Virtual memory used : 104532 KiB
+ -- Resident memory used : 58740 KiB

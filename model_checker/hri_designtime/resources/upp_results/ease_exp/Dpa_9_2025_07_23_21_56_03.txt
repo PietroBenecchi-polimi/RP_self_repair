@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1753307763
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_9.q:1
+ -- Throughput: 237225 runs/sec, Load: 364 runs[K -- Throughput: 262492 runs/sec, Load: 334 runs[K -- Throughput: 267694 runs/sec, Load: 304 runs[K -- Throughput: 264364 runs/sec, Load: 274 runs[K -- Throughput: 261634 runs/sec, Load: 245 runs[K -- Throughput: 257265 runs/sec, Load: 216 runs[K -- Throughput: 254692 runs/sec, Load: 189 runs[K -- Throughput: 262041 runs/sec, Load: 159 runs[K[2K -- Formula is satisfied.
+ -- Result: (207/239 runs) Pr(<> …) in [0.816272,0.906583] (95% CI)
+Values in [147.91659951509681,271.73283196910552] mean=211.01214385706427 steps=8.2544154969339161: 8 7 11 11 21 14 20 20 15 15 18 21 9 8 9
+ -- States explored : 2163239 states
+ -- CPU user time used : 8358 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58732 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_9.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.00443616 ± 0.00423229 (95% CI)
+
+Values in [0.00038387076910773033,0.020217612149992736] mean=0.0044361558102939073 steps=0.0049584353452212524: 8 1 0 1
+ -- States explored : 98446 states
+ -- CPU user time used : 452 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58732 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_9.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0365805 ± 0.00571519 (95% CI)
+
+Values in [0.01926023286526013,0.044274264525439366] mean=0.036580543236251595 steps=0.0062535079150448109: 1 1 2 6
+ -- States explored : 100415 states
+ -- CPU user time used : 461 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58732 KiB

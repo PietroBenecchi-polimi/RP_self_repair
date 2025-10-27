@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751880717
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:1
+ -- Throughput: 266967 runs/sec, Load: 358 runs[K -- Throughput: 278658 runs/sec, Load: 326 runs[K -- Throughput: 280112 runs/sec, Load: 294 runs[K -- Throughput: 281769 runs/sec, Load: 263 runs[K -- Throughput: 276789 runs/sec, Load: 232 runs[K -- Throughput: 277482 runs/sec, Load: 200 runs[K -- Throughput: 283992 runs/sec, Load: 168 runs[K -- Throughput: 282612 runs/sec, Load: 136 runs[K[2K -- Formula is satisfied.
+ -- Result: (47/274 runs) Pr(<> …) in [0.128842,0.221491] (95% CI)
+Values in [112.19139535537728,237.23156117118609] mean=161.32248412195881 steps=17.862880830829834: 11 7 11 7 4 4 3
+ -- States explored : 2418130 states
+ -- CPU user time used : 8665 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58568 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.313652 ± 0.164073 (95% CI)
+
+Values in [0.034394583742433538,0.77798270616805087] mean=0.31365158149580707 steps=0.18589703060640436: 4 3 2 1
+ -- States explored : 84774 states
+ -- CPU user time used : 390 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58568 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.189356 ± 0.285697 (95% CI)
+
+Values in [0,0.9721594060799521] mean=0.18935627665989047 steps=0.24303985151998808: 8 0 0 2
+ -- States explored : 77792 states
+ -- CPU user time used : 359 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58568 KiB

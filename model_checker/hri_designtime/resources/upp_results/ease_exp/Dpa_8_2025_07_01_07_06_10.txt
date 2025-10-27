@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751353570
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_8.q:1
+ -- Throughput: 199530 runs/sec, Load: 369 runs[K -- Throughput: 210473 runs/sec, Load: 350 runs[K -- Throughput: 225517 runs/sec, Load: 327 runs[K -- Throughput: 215395 runs/sec, Load: 305 runs[K -- Throughput: 214466 runs/sec, Load: 285 runs[K -- Throughput: 211086 runs/sec, Load: 266 runs[K -- Throughput: 212554 runs/sec, Load: 245 runs[K -- Throughput: 208619 runs/sec, Load: 225 runs[K[2K -- Formula is satisfied.
+ -- Result: (16/186 runs) Pr(<> …) in [0.0499693,0.135935] (95% CI)
+Values in [235.3124690345048,283.22863879526227] mean=261.48688658119181 steps=11.979042440189369: 4 2 6 4
+ -- States explored : 1935924 states
+ -- CPU user time used : 9070 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58624 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_8.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.480362 ± 0.160648 (95% CI)
+
+Values in [0.18941575402981303,0.78561889857302236] mean=0.48036177952145664 steps=0.14905078613580236: 3 1 3 3
+ -- States explored : 93579 states
+ -- CPU user time used : 549 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58624 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_8.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.485996 ± 0.36653 (95% CI)
+
+Values in [0,0.98977791122089387] mean=0.48599560407896103 steps=0.24744447780522352: 5 0 0 5
+ -- States explored : 87790 states
+ -- CPU user time used : 518 ms
+ -- Virtual memory used : 104536 KiB
+ -- Resident memory used : 58624 KiB

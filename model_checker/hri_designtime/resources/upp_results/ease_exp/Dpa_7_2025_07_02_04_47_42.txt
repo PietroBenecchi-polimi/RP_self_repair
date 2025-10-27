@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1751431662
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_7.q:1
+ -- Throughput: 248056 runs/sec, Load: 339 runs[K -- Throughput: 271679 runs/sec, Load: 286 runs[K -- Throughput: 264671 runs/sec, Load: 233 runs[K -- Throughput: 269938 runs/sec, Load: 180 runs[K -- Throughput: 270024 runs/sec, Load: 126 runs[K -- Throughput: 270102 runs/sec, Load: 74 runs[K -- Throughput: 264989 runs/sec, Load: 22 runs[K[2K -- Formula is satisfied.
+ -- Result: (198/403 runs) Pr(<> …) in [0.441485,0.541274] (95% CI)
+Values in [81.871709294965413,150.03189212355818] mean=117.6224903633735 steps=4.5440121885728519: 9 9 5 17 16 15 15 16 11 20 10 17 15 13 10
+ -- States explored : 2057714 states
+ -- CPU user time used : 7740 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58620 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_7.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0802279 ± 0.0362645 (95% CI)
+
+Values in [0.0049875208073176802,0.14358482251638616] mean=0.080227904432095501 steps=0.034649325427267126: 3 2 2 3
+ -- States explored : 89210 states
+ -- CPU user time used : 418 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58620 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_7.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.293818 ± 0.18269 (95% CI)
+
+Values in [0,0.64771706642281801] mean=0.29381820683353432 steps=0.16192926660570453: 3 3 1 3
+ -- States explored : 86430 states
+ -- CPU user time used : 393 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58620 KiB

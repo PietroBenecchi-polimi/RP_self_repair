@@ -1,0 +1,44 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1750941288
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_8.q:1
+ -- Throughput: 213619 runs/sec, Load: 369 runs[K -- Throughput: 244160 runs/sec, Load: 344 runs[K -- Throughput: 229861 runs/sec, Load: 316 runs[K[2K -- Aborted.
+ -- States explored : 795289 states
+ -- CPU user time used : 3436 ms
+ -- Virtual memory used : 105604 KiB
+ -- Resident memory used : 58604 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_8.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.055066 ± 0.0200823 (95% CI)
+
+Values in [0.01847042560447254,0.09882473504150624] mean=0.055065977567006819 steps=0.020088577359258428: 4 1 3 2
+ -- States explored : 90926 states
+ -- CPU user time used : 453 ms
+ -- Virtual memory used : 105604 KiB
+ -- Resident memory used : 58604 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_8.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.031724 ± 0.0148947 (95% CI)
+
+Values in [0,0.061827189428749207] mean=0.031724033658291351 steps=0.015456797357187305: 2 2 4 2
+ -- States explored : 92877 states
+ -- CPU user time used : 507 ms
+ -- Virtual memory used : 105604 KiB
+ -- Resident memory used : 58604 KiB
+[2K
+Verifying formula 4 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_8.q:4
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.114296 ± 0.0870617 (95% CI)
+
+Values in [0,0.33199975515460667] mean=0.11429584729570967 steps=0.082999938788651681: 5 2 1 2
+ -- States explored : 99224 states
+ -- CPU user time used : 517 ms
+ -- Virtual memory used : 105604 KiB
+ -- Resident memory used : 58604 KiB

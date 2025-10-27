@@ -1,0 +1,26 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1759781847
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:1
+ -- Throughput: 209584 runs/sec, Load: 359 runs[K -- Throughput: 231525 runs/sec, Load: 326 runs[K -- Throughput: 229083 runs/sec, Load: 296 runs[K -- Throughput: 227136 runs/sec, Load: 268 runs[K -- Throughput: 227338 runs/sec, Load: 241 runs[K -- Throughput: 234022 runs/sec, Load: 208 runs[K -- Throughput: 222527 runs/sec, Load: 181 runs[K -- Throughput: 228026 runs/sec, Load: 155 runs[K -- Throughput: 228706 runs/sec, Load: 123 runs[K -- Throughput: 233327 runs/sec, Load: 93 runs[K -- Throughput: 230987 runs/sec, Load: 62 runs[K -- Throughput: 220505 runs/sec, Load: 38 runs[K -- Throughput: 221447 runs/sec, Load: 13 runs[K[2K -- Formula is satisfied.
+ -- Result: (246/393 runs) Pr(<> …) in [0.576037,0.673958] (95% CI)
+Values in [93.732814257866394,132.2355606512013] mean=107.38181168008234 steps=2.4064216495834319: 15 0 50 17 2 78 2 20 35 1 14 7 0 3 0 2
+ -- States explored : 3118633 states
+ -- CPU user time used : 13788 ms
+ -- Virtual memory used : 104492 KiB
+ -- Resident memory used : 58660 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_12.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.98108 ± 0.0201295 (95% CI)
+
+Values in [0.93474363981490793,0.99879818139639931] mean=0.98107961788261311 steps=0.016013635395372847: 3 0 0 7
+ -- States explored : 101174 states
+ -- CPU user time used : 531 ms
+ -- Virtual memory used : 104492 KiB
+ -- Resident memory used : 58660 KiB

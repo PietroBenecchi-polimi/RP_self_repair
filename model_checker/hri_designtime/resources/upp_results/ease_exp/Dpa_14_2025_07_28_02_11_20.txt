@@ -1,0 +1,36 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1753668680
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_14.q:1
+ -- Throughput: 197929 runs/sec, Load: 368 runs[K -- Throughput: 217696 runs/sec, Load: 345 runs[K -- Throughput: 220954 runs/sec, Load: 320 runs[K -- Throughput: 207958 runs/sec, Load: 298 runs[K -- Throughput: 219283 runs/sec, Load: 275 runs[K -- Throughput: 219028 runs/sec, Load: 254 runs[K -- Throughput: 219810 runs/sec, Load: 230 runs[K -- Throughput: 213858 runs/sec, Load: 208 runs[K[2K -- Formula is satisfied.
+ -- Result: (16/186 runs) Pr(<> …) in [0.0499693,0.135935] (95% CI)
+Values in [213.53702728330384,284.96812592401596] mean=242.41311810380253 steps=17.857774660178034: 6 4 4 2
+ -- States explored : 1784002 states
+ -- CPU user time used : 8312 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58424 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_14.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.476932 ± 0.21683 (95% CI)
+
+Values in [0,0.85412424314377289] mean=0.47693167091516414 steps=0.21353106078594328: 2 2 3 3
+ -- States explored : 88442 states
+ -- CPU user time used : 535 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58424 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_14.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.460067 ± 0.348487 (95% CI)
+
+Values in [0,0.9869877017291171] mean=0.46006709984800348 steps=0.24674692543227933: 5 0 0 5
+ -- States explored : 85812 states
+ -- CPU user time used : 516 ms
+ -- Virtual memory used : 104528 KiB
+ -- Resident memory used : 58424 KiB

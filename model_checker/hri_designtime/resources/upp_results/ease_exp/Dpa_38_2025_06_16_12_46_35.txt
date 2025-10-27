@@ -1,0 +1,44 @@
+Options for the verification:
+  Generating no trace
+  Search order is breadth first
+  Using conservative space optimisation
+  Seed is 1750077995
+  State space representation uses minimal constraint systems with future testing
+  Using HashMap + Compress integers for discrete state storage
+[2K
+Verifying formula 1 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_38.q:1
+ -- Throughput: 162690 runs/sec, Load: 375 runs[K -- Throughput: 189351 runs/sec, Load: 356 runs[K -- Throughput: 186622 runs/sec, Load: 340 runs[K[2K -- Aborted.
+ -- States explored : 661497 states
+ -- CPU user time used : 3637 ms
+ -- Virtual memory used : 105596 KiB
+ -- Resident memory used : 58652 KiB
+[2K
+Verifying formula 2 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_38.q:2
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.160888 ± 0.0124149 (95% CI)
+
+Values in [0.12579323185630875,0.1873430922692505] mean=0.16088836084498179 steps=0.015387465103235441: 1 2 4 3
+ -- States explored : 101497 states
+ -- CPU user time used : 662 ms
+ -- Virtual memory used : 105596 KiB
+ -- Resident memory used : 58652 KiB
+[2K
+Verifying formula 3 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_38.q:3
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.0142428 ± 0.0102131 (95% CI)
+
+Values in [0,0.044632700617896481] mean=0.014242818804386681 steps=0.011158175154474122: 4 4 1 1
+ -- States explored : 93248 states
+ -- CPU user time used : 622 ms
+ -- Virtual memory used : 105596 KiB
+ -- Resident memory used : 58652 KiB
+[2K
+Verifying formula 4 at ./model_checker/hri_designtime/resources/gen_models/ease_exp/Dpa_38.q:4
+[2K -- Formula is satisfied.
+ -- Result: (10 runs) E(max) = 0.00350145 ± 0.00540991 (95% CI)
+
+Values in [0,0.023984623385880144] mean=0.0035014532582408691 steps=0.0059961558464700377: 8 1 0 1
+ -- States explored : 94552 states
+ -- CPU user time used : 617 ms
+ -- Virtual memory used : 105596 KiB
+ -- Resident memory used : 58652 KiB
